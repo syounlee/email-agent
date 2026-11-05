@@ -11,7 +11,7 @@ Each listener file has:
 - ListenerRegistry loads every file and reloads any file you change, add or
   delete (checked before each new email, so no restart is needed).
 - run_listeners() runs the enabled ones on one email and logs every run to
-  DATA_DIR/listener_runs.jsonl.
+  DATA_DIR/listener_runs-<mailbox>.jsonl (one log per mailbox).
 - context gives a listener: star_email, archive_email, add_label, notify,
   and call_claude(prompt, schema, model="haiku").
 
@@ -35,7 +35,7 @@ from email_agent.claude_json import call_claude
 from email_agent.config import PROJECT_ROOT, load_config
 
 LISTENERS_DIR = PROJECT_ROOT / "scripts" / "listeners"
-LOG_FILENAME = "listener_runs.jsonl"
+LOG_FILENAME = "listener_runs-{mailbox}.jsonl"  # one log per mailbox, so they never mix
 HANDLER_TIMEOUT_SECONDS = 120
 
 
@@ -212,7 +212,8 @@ def check_result(result) -> dict:
 # ---------- running ----------
 
 def log_path() -> Path:
-    return load_config().data_dir / LOG_FILENAME
+    config = load_config()
+    return config.data_dir / LOG_FILENAME.format(mailbox=config.mailbox)
 
 
 def write_log(entry: dict, path: Path | None = None) -> None:

@@ -61,6 +61,12 @@ def bump_mtime(path):
     os.utime(path, (st.st_atime, st.st_mtime + 5))
 
 
+def test_each_mailbox_has_its_own_log(monkeypatch):
+    assert log_path().name == "listener_runs-demo.jsonl"
+    monkeypatch.setenv("MAILBOX", "imap")
+    assert log_path().name == "listener_runs-imap.jsonl"
+
+
 def read_log():
     return [json.loads(line) for line in log_path().read_text().splitlines()]
 

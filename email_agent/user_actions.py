@@ -10,7 +10,7 @@ Each action file has:
     async def handler(params, context):
         return {"executed": True, "reason": "what was done"}
 
-Runs are logged to DATA_DIR/action_runs.jsonl. Files reload automatically.
+Runs are logged to DATA_DIR/action_runs-<mailbox>.jsonl. Files reload automatically.
 """
 
 import shlex
@@ -24,8 +24,13 @@ from email_agent.listeners import (
 )
 
 ACTIONS_DIR = PROJECT_ROOT / "scripts" / "actions"
-LOG_FILENAME = "action_runs.jsonl"
+LOG_FILENAME = "action_runs-{mailbox}.jsonl"  # one log per mailbox
 TYPES = ("string", "integer", "number", "boolean")
+
+
+def action_log_path() -> Path:
+    config = load_config()
+    return config.data_dir / LOG_FILENAME.format(mailbox=config.mailbox)
 
 
 class ActionInputError(Exception):
@@ -153,5 +158,5 @@ async def run_action_with_params(action_id: str, raw: dict, registry: ActionRegi
         entry.update(executed=False, reason="error", error=f"{type(problem).__name__}: {problem}")
     entry.update(changes=context.actions, **usage_summary(context),
                  duration_ms=round((time.monotonic() - started) * 1000))
-    write_log(entry, load_config().data_dir / LOG_FILENAME)
+    write_log(entry, action_log_path())
     return entry

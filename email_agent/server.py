@@ -17,9 +17,13 @@ HTTP
     POST /api/actions/{id}  {"params": {...}}
     POST /api/sync                      fetch new mail, run the listeners
     POST /api/demo/deliver {"kind"}     demo mailbox only: pretend mail arrived
+    GET  /api/info                      mailbox, model, demo email kinds (for the page)
+    GET  /api/runs?limit=20             newest listener runs, all listeners
+    GET  /                              the web page (files in email_agent/web/)
 
 WebSocket /ws  (JSON messages)
     you send:   {"type": "chat", "content": "...", "session_id": optional}
+                {"type": "new_chat"}       forget this browser's conversation
                 {"type": "approval", "id": "...", "allow": true/false}
                 {"type": "ping"}
     you get:    chat_started, assistant_text, tool_call, approval_request,
@@ -40,8 +44,9 @@ from claude_agent_sdk import (
 )
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse, PlainTextResponse
-from starlette.routing import Route, WebSocketRoute
+from starlette.responses import FileResponse, JSONResponse, PlainTextResponse
+from starlette.routing import Mount, Route, WebSocketRoute
+from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from email_agent import database, mailbox
@@ -57,6 +62,7 @@ from email_agent.tools import READ_TOOLS, TOOL_TO_ACTION
 from email_agent.user_actions import ActionInputError, ActionRegistry, run_action_with_params
 
 APPROVAL_TIMEOUT_SECONDS = 300  # no answer in 5 minutes = "no"
+WEB_DIR = PROJECT_ROOT / "email_agent" / "web"
 
 
 def log(message: str) -> None:
@@ -160,7 +166,10 @@ class Browser:
     # --- chat ---
     async def run_chat(self, text: str, session_id: str | None) -> None:
         if session_id and session_id != self.session_id:  # e.g. after a page reload
-            self.session_id, self.total_cost = session_id, None  # earlier cost unknown
+            # Continue that conversation. Its cost so far is known if this server
+            # saw it (None = unknown, e.g. after a server restart).
+            self.session_id = session_id
+            self.total_cost = self.state.session_costs.get(session_id)
         budget = self.state.config.max_budget_usd
         if self.total_cost is not None and self.total_cost >= budget:
             await self.send({"type": "error", "message": f"Budget cap reached (${budget:.2f}) "
@@ -177,10 +186,17 @@ class Browser:
             return
         previous = self.total_cost
         self.session_id, self.total_cost = out["session_id"], out["total_cost_usd"]
+        self.state.session_costs[out["session_id"]] = out["total_cost_usd"]
         this_answer = None if previous is None else max(out["total_cost_usd"] - previous, 0.0)
         await self.send({"type": "result", "text": out["text"], "session_id": out["session_id"],
                          "cost_usd": this_answer, "session_cost_usd": out["total_cost_usd"],
                          "is_error": out["is_error"], "subtype": out["subtype"]})
+
+    def new_chat(self) -> bool:
+        if self.chat_task and not self.chat_task.done():
+            return False
+        self.session_id, self.total_cost = None, 0.0
+        return True
 
     def close(self) -> None:
         if self.chat_task and not self.chat_task.done():
@@ -197,6 +213,7 @@ class AppState:
         self.config, self.chat_turn, self.sync_fn, self.root = config, chat_turn, sync_fn, root
         self.listeners, self.actions = listeners, actions
         self.browsers: set[Browser] = set()
+        self.session_costs: dict[str, float] = {}  # conversation -> running cost
         self.sync_lock = asyncio.Lock()
 
     async def broadcast(self, event: dict) -> None:
@@ -360,6 +377,37 @@ async def post_demo_deliver(request: Request):
     return JSONResponse({"email_id": email_id, "listener_runs": entries})
 
 
+async def get_info(request: Request):
+    config = state_of(request).config
+    return JSONResponse({"mailbox": config.mailbox, "model": config.model,
+                         "budget_usd": config.max_budget_usd,
+                         "demo_kinds": list(DEMO_EMAILS) if config.mailbox == "demo" else []})
+
+
+async def get_runs(request: Request):
+    runs = await asyncio.to_thread(read_log, None, _int_param(request, "limit", 20))
+    return JSONResponse({"runs": runs[::-1]})  # newest first
+
+
+def page_headers(port: int) -> dict:
+    """Strict browser rules for the page: only our own scripts and connections."""
+    sockets = f"ws://127.0.0.1:{port} ws://localhost:{port}"
+    return {
+        "Content-Security-Policy": (
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+            f"connect-src 'self' {sockets}; base-uri 'none'; form-action 'none'; "
+            "frame-ancestors 'none'"),
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Cache-Control": "no-store",
+    }
+
+
+async def get_page(request: Request):
+    port = state_of(request).config.port
+    return FileResponse(WEB_DIR / "index.html", headers=page_headers(port))
+
+
 # ---------- WebSocket chat ----------
 
 async def websocket_chat(ws: WebSocket):
@@ -389,6 +437,12 @@ async def websocket_chat(ws: WebSocket):
             elif kind == "approval":
                 if not browser.answer(str(message.get("id")), message.get("allow") is True):
                     await browser.send({"type": "error", "message": "No such approval waiting"})
+            elif kind == "new_chat":
+                if browser.new_chat():
+                    await browser.send({"type": "new_chat"})
+                else:
+                    await browser.send({"type": "error",
+                                        "message": "Still answering the previous message"})
             elif kind == "ping":
                 await browser.send({"type": "pong"})
             else:
@@ -484,7 +538,11 @@ def create_app(config: Config | None = None, *, chat_turn=None, sync_fn=sync,
         Route("/api/actions/{action_id}", post_action, methods=["POST"]),
         Route("/api/sync", post_sync, methods=["POST"]),
         Route("/api/demo/deliver", post_demo_deliver, methods=["POST"]),
+        Route("/api/info", get_info, methods=["GET"]),
+        Route("/api/runs", get_runs, methods=["GET"]),
         WebSocketRoute("/ws", websocket_chat),
+        Route("/", get_page, methods=["GET"]),
+        Mount("/static", StaticFiles(directory=WEB_DIR), name="static"),
     ], lifespan=lifespan)
     app.state.app_state = state
     app.add_middleware(LocalOnly, port=config.port)

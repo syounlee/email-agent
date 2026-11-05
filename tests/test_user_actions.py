@@ -9,7 +9,7 @@ from email_agent.config import PROJECT_ROOT, load_config
 from email_agent.listeners import ListenerRegistry
 from email_agent.mailbox import read_email
 from email_agent.user_actions import (
-    LOG_FILENAME, ActionInputError, ActionRegistry, build_params, describe, parse_run_command,
+    ActionInputError, ActionRegistry, build_params, describe, parse_run_command,
     run_action,
 )
 
@@ -66,7 +66,9 @@ async def test_archive_old_newsletters_dry_run_then_real(monkeypatch):
     again = await run_action("/run archive-old-newsletters days=3", show=lambda _: None)
     assert again["executed"] is False  # already archived
 
-    log = (load_config().data_dir / LOG_FILENAME).read_text().splitlines()
+    from email_agent.user_actions import action_log_path
+    assert action_log_path().name == "action_runs-demo.jsonl"
+    log = action_log_path().read_text().splitlines()
     assert [json.loads(line)["params"]["dry_run"] for line in log] == [True, False, False]
 
 

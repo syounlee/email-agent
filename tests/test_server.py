@@ -248,6 +248,17 @@ def test_resume_after_page_reload(client, fake):
     assert result["cost_usd"] is None  # earlier cost of that conversation is unknown
 
 
+def test_reconnecting_browser_keeps_the_cost_total(client, fake):
+    with client.websocket_connect(WS) as ws:
+        ws.send_json({"type": "chat", "content": "hi"})
+        first = receive_until(ws, "result")[-1]
+    with client.websocket_connect(WS) as ws:  # page reload: a new connection
+        ws.send_json({"type": "chat", "content": "again", "session_id": first["session_id"]})
+        second = receive_until(ws, "result")[-1]
+    assert fake.calls[1]["resume"] == "session-1"
+    assert second["cost_usd"] == pytest.approx(0.01)  # known, not "unknown"
+
+
 def test_approval_while_chat_runs_in_background(client):
     from email_agent.mailbox import read_email
 
@@ -357,3 +368,48 @@ def test_watcher_starts_and_stops_with_the_server(listeners_dir, fake, monkeypat
         started["on_new_mail"]()  # what the watcher thread calls when Gmail says "new mail"
         assert len(syncs) == 2  # one catch-up at start + one for the new mail
     assert started["stop"].is_set() and not started["thread"].is_alive()  # stopped cleanly
+
+
+# ---------- the web page (step 10) ----------
+
+def test_page_is_served_with_strict_browser_rules(client):
+    r = client.get("/")
+    assert r.status_code == 200 and "<title>Email Agent</title>" in r.text
+    csp = r.headers["content-security-policy"]
+    assert "script-src 'self'" in csp and "frame-ancestors 'none'" in csp
+    assert "ws://127.0.0.1:3000" in csp
+    assert client.get("/static/app.js").status_code == 200
+    assert client.get("/static/style.css").status_code == 200
+    assert client.get("/static/../server.py").status_code == 404  # no escaping the folder
+
+
+def test_page_never_inserts_text_as_html():
+    from email_agent.server import WEB_DIR
+
+    js = (WEB_DIR / "app.js").read_text()
+    for risky in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval("):
+        assert risky not in js, risky
+    html = (WEB_DIR / "index.html").read_text()
+    assert "<script>" not in html and "onclick=" not in html  # no inline scripts (CSP blocks them)
+
+
+def test_info_and_runs(client):
+    info = client.get("/api/info").json()
+    assert info["mailbox"] == "demo" and "bug" in info["demo_kinds"]
+    assert client.get("/api/runs").json() == {"runs": []}
+    client.post("/api/demo/deliver", json={"kind": "bug"})
+    client.post("/api/demo/deliver", json={"kind": "receipt"})
+    runs = client.get("/api/runs?limit=5").json()["runs"]
+    assert [r["subject"][:10] for r in runs] == ["Your recei", "Bug report"]  # newest first
+
+
+def test_new_chat_starts_a_fresh_conversation(client, fake):
+    with client.websocket_connect(WS) as ws:
+        ws.send_json({"type": "chat", "content": "one"})
+        receive_until(ws, "result")
+        ws.send_json({"type": "new_chat"})
+        assert ws.receive_json() == {"type": "new_chat"}
+        ws.send_json({"type": "chat", "content": "two"})
+        result = receive_until(ws, "result")[-1]
+    assert [c["resume"] for c in fake.calls] == [None, None]
+    assert result["cost_usd"] == pytest.approx(0.02)  # fake's running total; new chat starts at 0

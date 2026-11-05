@@ -9,3 +9,6 @@ data/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Browser-automation scratch files
+.playwright-mcp/
