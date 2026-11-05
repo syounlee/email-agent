@@ -23,6 +23,7 @@ import asyncio
 import importlib.util
 import inspect
 import json
+import re
 import time
 import uuid
 from contextlib import closing
@@ -75,9 +76,9 @@ class ScriptRegistry:
                 self.show(f"⚠️  {path.name} not loaded: {self.errors[path]}")
 
     def all(self) -> list:
-        """Every script that loaded fine, after checking the folder for changes."""
+        """Every script that loaded fine (in file-name order), after checking for changes."""
         self.refresh()
-        return list(self.modules.values())
+        return [self.modules[path] for path in sorted(self.modules)]
 
 
 def _load(path: Path, check):
@@ -141,6 +142,12 @@ class ScriptContext:
     async def add_label(self, email_id: str, label: str) -> str:
         return await self._apply("add_label", email_id, label)
 
+    async def mark_read(self, email_id: str) -> str:
+        return await self._apply("mark_read", email_id)
+
+    async def mark_unread(self, email_id: str) -> str:
+        return await self._apply("mark_unread", email_id)
+
     async def notify(self, message: str) -> None:
         self.show(f"🔔 {message}")
         self.actions.append(f"notified: {message}")
@@ -158,6 +165,29 @@ class ScriptContext:
 
 
 ListenerContext = ScriptContext  # older name
+
+
+class PreviewContext(ScriptContext):
+    """Like ScriptContext, but changes nothing: it only records what WOULD happen.
+
+    Claude calls are real (so you see real decisions and real costs).
+    """
+
+    async def _apply(self, action: str, email_id: str, label: str | None = None) -> str:
+        message = f"would {action.replace('_', ' ')}" + (f" '{label}'" if label else "")
+        self.actions.append(message)
+        return message
+
+    async def notify(self, message: str) -> None:
+        self.actions.append(f"would notify: {message}")
+
+
+_CODE = re.compile(r"\b\d{3}[- ]?\d{3}\b")
+
+
+def mask_codes(text: str) -> str:
+    """Hide 6-digit login codes (e.g. '946636 is your code') before writing to the log."""
+    return _CODE.sub("••••••", text)
 
 
 def usage_summary(context: ScriptContext) -> dict:
@@ -193,18 +223,21 @@ def write_log(entry: dict, path: Path | None = None) -> None:
 
 
 async def run_listeners(email: dict, registry: ListenerRegistry, show=print,
-                        claude_client=None) -> list[dict]:
-    """Run every enabled listener on one email. Returns (and logs) one entry per run."""
+                        claude_client=None, preview: bool = False) -> list[dict]:
+    """Run every enabled listener on one email. Returns (and logs) one entry per run.
+
+    preview=True: change nothing and write no log; just report what would happen.
+    """
     entries = []
     for module in registry.enabled("email_received"):
         listener_id = module.config["id"]
-        context = ListenerContext(listener_id, show, claude_client)
+        context = (PreviewContext if preview else ScriptContext)(listener_id, show, claude_client)
         started = time.monotonic()
         entry = {
             "time": datetime.now().isoformat(timespec="seconds"),
             "listener": listener_id,
             "email_id": email["id"],
-            "subject": email["subject"],
+            "subject": mask_codes(email["subject"]),
         }
         try:
             result = check_result(await asyncio.wait_for(module.handler(dict(email), context),
@@ -215,6 +248,9 @@ async def run_listeners(email: dict, registry: ListenerRegistry, show=print,
                          error=f"{type(problem).__name__}: {problem}")
         entry.update(actions=context.actions, **usage_summary(context),
                      duration_ms=round((time.monotonic() - started) * 1000))
+        if preview:
+            entries.append(entry)
+            continue
         write_log(entry)
         status = "✅" if entry["executed"] else ("❌" if "error" in entry else "➖")
         show(f"🎧 {status} {listener_id}: {entry.get('error') or entry['reason']}")

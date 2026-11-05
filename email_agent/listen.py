@@ -2,6 +2,8 @@
 
     uv run python -m email_agent.listen                 # MAILBOX=imap: watch Gmail
     uv run python -m email_agent.listen demo receipt    # MAILBOX=demo: fake an arrival
+    uv run python -m email_agent.listen preview 100     # try the listeners on the 100
+                                                        # newest stored emails, changing nothing
 
 Demo emails you can deliver: receipt, invoice, overdue, newsletter, bug.
 Press Ctrl+C to stop watching.
@@ -14,7 +16,13 @@ from datetime import date, timedelta
 from email_agent.config import load_config
 from email_agent.idle_watcher import start_watcher
 from email_agent.imap_sync import sync
-from email_agent.listeners import ListenerRegistry, deliver_demo_email, log_path, process_pending
+from collections import Counter
+from contextlib import closing
+
+from email_agent import database
+from email_agent.listeners import (
+    ListenerRegistry, deliver_demo_email, log_path, process_pending, run_listeners,
+)
 
 _today = date.today()
 DEMO_EMAILS = {
@@ -57,6 +65,38 @@ async def demo(kind: str) -> None:
     print(f"Log: {log_path()}")
 
 
+async def preview(count: int, show=print, claude_client=None) -> dict:
+    """Run the enabled listeners on the newest stored emails WITHOUT changing anything.
+
+    Claude calls are real, so you see real decisions and the real cost.
+    """
+    with closing(database.open_db()) as conn:
+        ids = [r[0] for r in conn.execute(
+            "SELECT id FROM emails ORDER BY date DESC LIMIT ?", (count,))]
+        emails = database.read(conn, ids)
+    registry = ListenerRegistry(show=show)
+    did, cost, flagged = Counter(), 0.0, []
+    for email in reversed(emails):  # oldest first, like real arrivals
+        entries = await run_listeners(email, registry, show, claude_client, preview=True)
+        cost += sum(e["cost_usd"] for e in entries)
+        changes = [a for e in entries for a in e["actions"]]
+        for e in entries:
+            if "error" in e:
+                show(f"   ❌ {e['listener']} failed on '{e['subject'][:50]}': {e['error']}")
+        did.update(a for a in changes if a.startswith("would add label"))
+        if any("notify" in a or "star" in a for a in changes):
+            flagged.append((email["date"][:10], [a for a in changes if "notify" in a] or changes))
+    show(f"\nPreview of {len(emails)} emails (nothing was changed):")
+    for label, n in did.most_common():
+        show(f"  {n:4}  {label}")
+    show(f"\n  {len(flagged)} emails would be starred or notified:")
+    for day, notes in flagged:
+        show(f"    {day}  {notes[0].replace('would notify: ', '🔔 ')[:110]}")
+    show(f"\n  Claude cost of this preview: ${cost:.4f} "
+         f"(${cost / max(len(emails), 1) * 1000:.2f} per 1,000 emails)")
+    return {"labels": dict(did), "flagged": len(flagged), "cost_usd": cost}
+
+
 async def watch_gmail() -> None:
     config = load_config()
     registry = ListenerRegistry()
@@ -86,7 +126,9 @@ def main() -> None:
     config = load_config()
     args = sys.argv[1:]
     try:
-        if args[:1] == ["demo"]:
+        if args[:1] == ["preview"]:
+            asyncio.run(preview(int(args[1]) if len(args) > 1 else 50))
+        elif args[:1] == ["demo"]:
             if config.mailbox != "demo":
                 sys.exit("Demo delivery needs MAILBOX=demo, e.g.  MAILBOX=demo uv run python "
                          "-m email_agent.listen demo receipt")

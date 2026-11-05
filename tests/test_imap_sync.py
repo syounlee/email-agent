@@ -210,9 +210,9 @@ def test_sync_is_read_only_and_takes_newest(imap_config, imap_db):
     [fetch] = [c for c in server.calls if c[0] == "fetch"]
     assert fetch[1] == [103, 104, 105]  # the 3 NEWEST, not the oldest
     assert "BODY.PEEK[]" in fetch[2]  # PEEK = don't mark as read
-    assert result == {"found": 3, "already_stored": 0, "added": 3,
-                      "new_ids": ["<msg-3@example.com>", "<msg-4@example.com>",
-                                  "<msg-5@example.com>"]}
+    assert result == {"found": 3, "already_stored": 0, "added": 3,  # newest first
+                      "new_ids": ["<msg-5@example.com>", "<msg-4@example.com>",
+                                  "<msg-3@example.com>"]}
 
 
 def test_sync_stores_uid_folder_and_gmail_labels(imap_config, imap_db):
@@ -279,3 +279,24 @@ def test_real_gmail_sync_is_read_only(tmp_path, monkeypatch):
         result = sync(cfg, conn)
         assert result["found"] <= cfg.sync_max_emails
         assert database.count(conn) == result["added"]
+
+
+def test_big_sync_downloads_in_batches_newest_first(imap_config, imap_db, monkeypatch):
+    import dataclasses
+
+    cfg = dataclasses.replace(imap_config, sync_max_emails=120)
+    server = FakeServer(_numbered(120))
+    progress = []
+    result = sync(cfg, imap_db, connect=lambda c: server, show=progress.append)
+    fetches = [c[1] for c in server.calls if c[0] == "fetch"]
+    assert [len(f) for f in fetches] == [50, 50, 20]
+    assert fetches[0][-1] == 220  # newest batch first
+    assert result["added"] == 120 and database.count(imap_db) == 120
+    assert progress[-1] == "  ... 120/120 downloaded"
+
+
+def test_backfill_never_marks_mail_for_listeners(imap_config, imap_db):
+    sync(imap_config, imap_db, connect=lambda c: FakeServer(_numbered(2)))  # first sync
+    sync(imap_config, imap_db, connect=lambda c: FakeServer(_numbered(3)), pending=False)
+    assert database.count(imap_db) == 3
+    assert database.pending_for_listeners(imap_db) == []  # old mail, not "new"

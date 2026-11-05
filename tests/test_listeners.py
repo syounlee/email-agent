@@ -19,6 +19,12 @@ from email_agent.listeners import ListenerRegistry, deliver_demo_email, log_path
 EXAMPLE = PROJECT_ROOT / "scripts" / "listeners" / "finance_labeler.py"
 
 
+def copy_enabled(src, folder):
+    """Copy a listener file into folder, switched on (the real one may be off)."""
+    text = src.read_text().replace('"enabled": False', '"enabled": True')
+    (folder / src.name).write_text(text)
+
+
 # ---------- a fake Claude that answers with whatever JSON we tell it ----------
 
 class FakeClaude:
@@ -139,7 +145,7 @@ async def test_context_actions_change_the_mailbox(tmp_path):
 def example_only(tmp_path):
     folder = tmp_path / "listeners"
     folder.mkdir()
-    shutil.copy(EXAMPLE, folder)
+    copy_enabled(EXAMPLE, folder)
     return ListenerRegistry(folder)
 
 

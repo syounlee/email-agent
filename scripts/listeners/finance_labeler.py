@@ -9,7 +9,7 @@ from datetime import date
 config = {
     "id": "finance-labeler",
     "name": "Label receipts and invoices as Finance, star overdue ones",
-    "enabled": True,
+    "enabled": False,  # replaced by triage.py
     "event": "email_received",
 }
 

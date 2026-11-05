@@ -6,7 +6,13 @@ READ-ONLY by design:
 Nothing here can change, move, delete or send mail.
 
     uv run python -m email_agent.imap_sync     # sync now and show a summary
+
+    # one-off: copy in older mail too, WITHOUT running the listeners on it
+    uv run python -m email_agent.imap_sync --days 30 --max 2000 --backfill
 """
+
+import argparse
+import dataclasses
 
 import email
 import hashlib
@@ -22,6 +28,7 @@ from email_agent import database
 from email_agent.config import Config, load_config
 
 MAX_BODY_CHARS = 20_000  # long newsletters get cut so they don't flood Claude
+FETCH_BATCH = 50  # download this many emails per request (and save after each batch)
 
 
 # ---------- parsing one raw email (offline, built-in `email` package) ----------
@@ -150,9 +157,13 @@ def _connect(config: Config):
     return IMAPClient(config.imap_host, ssl=True, timeout=30)
 
 
-def sync(config: Config | None = None, conn=None, connect=_connect, today: date | None = None) -> dict:
+def sync(config: Config | None = None, conn=None, connect=_connect, today: date | None = None,
+         pending: bool | None = None, show=lambda message: None) -> dict:
     """Copy the newest emails from the last few days into the database.
 
+    pending: should the listeners treat the added emails as new mail?
+      None (normal): yes, except on the very first sync into an empty database.
+      False (backfill): no, these are old emails being copied in.
     Returns a summary: how many were found, already stored, and added.
     `connect` and `today` can be swapped in tests.
     """
@@ -174,19 +185,22 @@ def sync(config: Config | None = None, conn=None, connect=_connect, today: date 
             newest = sorted(uids)[-config.sync_max_emails:] if config.sync_max_emails else []
 
             already = database.stored_uids(conn, config.imap_folder, uidvalidity)
-            # The very first sync fills an empty database: don't treat those
-            # (possibly 30) old emails as "new mail" for the listeners.
-            first_sync = database.count(conn) == 0
-            to_fetch = [u for u in newest if u not in already]
+            if pending is None:
+                # The very first sync fills an empty database: don't treat those
+                # (possibly 30) old emails as "new mail" for the listeners.
+                pending = database.count(conn) > 0
+            # Newest first, so if a long backfill is interrupted, the recent mail is in.
+            to_fetch = [u for u in reversed(newest) if u not in already]
 
-            emails = []
-            if to_fetch:
-                # BODY.PEEK[] reads the whole message WITHOUT setting the \Seen flag.
-                items = ["BODY.PEEK[]", "FLAGS", "INTERNALDATE"]
-                if server.has_capability("X-GM-EXT-1"):  # Gmail: also get its labels
-                    items.append("X-GM-LABELS")
-                fetched = server.fetch(to_fetch, items)
-                for uid, data in fetched.items():
+            # BODY.PEEK[] reads the whole message WITHOUT setting the \Seen flag.
+            items = ["BODY.PEEK[]", "FLAGS", "INTERNALDATE"]
+            if to_fetch and server.has_capability("X-GM-EXT-1"):  # Gmail: also its labels
+                items.append("X-GM-LABELS")
+            new_ids = []
+            for start in range(0, len(to_fetch), FETCH_BATCH):
+                batch = to_fetch[start:start + FETCH_BATCH]
+                emails = []
+                for uid, data in server.fetch(batch, items).items():
                     raw = data.get(b"BODY[]")  # the server answers PEEK as BODY[]
                     if raw is None:
                         continue
@@ -195,7 +209,8 @@ def sync(config: Config | None = None, conn=None, connect=_connect, today: date 
                         flags=data.get(b"FLAGS", ()), internal_date=data.get(b"INTERNALDATE"),
                         gmail_labels=data.get(b"X-GM-LABELS"),
                     ))
-            new_ids = database.add_emails(conn, emails, pending=not first_sync)
+                new_ids += database.add_emails(conn, emails, pending=pending)  # saved per batch
+                show(f"  ... {min(start + FETCH_BATCH, len(to_fetch))}/{len(to_fetch)} downloaded")
     finally:
         if own_conn:
             conn.close()
@@ -205,11 +220,21 @@ def sync(config: Config | None = None, conn=None, connect=_connect, today: date 
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Copy recent Gmail into the database (read-only).")
+    parser.add_argument("--days", type=int, help="look back this many days (default: SYNC_DAYS)")
+    parser.add_argument("--max", type=int, help="at most this many emails (default: SYNC_MAX_EMAILS)")
+    parser.add_argument("--backfill", action="store_true",
+                        help="old mail: don't run the listeners on what this copies in")
+    args = parser.parse_args()
+
     config = load_config()
+    config = dataclasses.replace(config, sync_days=args.days or config.sync_days,
+                                 sync_max_emails=args.max or config.sync_max_emails)
     print(f"Syncing up to {config.sync_max_emails} emails from the last "
-          f"{config.sync_days} days of {config.imap_folder} (read-only)...")
+          f"{config.sync_days} days of {config.imap_folder} (read-only)"
+          f"{', backfill: listeners will not run on these' if args.backfill else ''}...")
     try:
-        result = sync(config)
+        result = sync(config, pending=False if args.backfill else None, show=print)
     except Exception as problem:  # login errors etc.; message never includes the password
         print(f"Sync failed: {type(problem).__name__}: {problem}")
         raise SystemExit(1)

@@ -25,7 +25,8 @@ async def test_real_structured_output():
 async def test_real_demo_receipt_gets_finance_label(tmp_path):
     folder = tmp_path / "listeners"
     folder.mkdir()
-    shutil.copy(PROJECT_ROOT / "scripts" / "listeners" / "finance_labeler.py", folder)
+    src = PROJECT_ROOT / "scripts" / "listeners" / "finance_labeler.py"
+    (folder / src.name).write_text(src.read_text().replace('"enabled": False', '"enabled": True'))
     email_id, [entry] = await deliver_demo_email(
         "receipts@pharmacy.example.com", "Your receipt from Example Pharmacy",
         "Thank you!\n1 x Vitamin D ... $12.99\nTotal paid: $12.99 (card ending 0000)",
