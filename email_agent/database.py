@@ -188,6 +188,7 @@ class ParsedQuery:
     unread: bool | None = None                              # is:unread / is:read
     starred: bool | None = None                             # is:starred
     newer_than: timedelta | None = None                     # newer_than:7d
+    older_than: timedelta | None = None                     # older_than:30d
 
 
 # Pieces of a query: op:"quoted value" | op:value | "quoted phrase" | word
@@ -197,7 +198,7 @@ _DAYS_PER_UNIT = {"d": 1, "w": 7, "m": 30, "y": 365}
 
 SEARCH_HELP = (
     'words, "exact phrase", from:name, subject:word, is:unread, is:read, '
-    "is:starred, newer_than:7d (d=days, w=weeks, m=months, y=years)"
+    "is:starred, newer_than:7d, older_than:30d (d=days, w=weeks, m=months, y=years)"
 )
 
 
@@ -221,12 +222,12 @@ def parse_query(query: str) -> ParsedQuery:
                 parsed.starred = True
             else:
                 raise ValueError(f"Unsupported is:{value}. Supported: {SEARCH_HELP}")
-        elif op == "newer_than":
+        elif op in ("newer_than", "older_than"):
             age = _AGE.fullmatch(value.lower())
             if not age:
-                raise ValueError(f"Bad newer_than:{value}. Use e.g. newer_than:7d")
+                raise ValueError(f"Bad {op}:{value}. Use e.g. {op}:7d")
             days = int(age.group(1)) * _DAYS_PER_UNIT[age.group(2)]
-            parsed.newer_than = timedelta(days=days)
+            setattr(parsed, op, timedelta(days=days))
         elif op:  # something like re:hello -> treat as ordinary text
             parsed.words.append(m.group(0).replace('"', ""))
         else:  # a "quoted phrase" or a plain word
@@ -267,6 +268,10 @@ def search(conn: sqlite3.Connection, query: str, limit: int = 10,
     if parsed.newer_than is not None:
         cutoff = (now or datetime.now()) - parsed.newer_than
         conditions.append("date >= ?")
+        params.append(cutoff.isoformat(timespec="seconds"))
+    if parsed.older_than is not None:
+        cutoff = (now or datetime.now()) - parsed.older_than
+        conditions.append("date < ?")
         params.append(cutoff.isoformat(timespec="seconds"))
 
     where = " AND ".join(conditions) or "1"

@@ -31,7 +31,7 @@ def _as_text(data) -> dict:
     "question. Gmail-style syntax; all parts must match: plain words (matched "
     'in subject, sender or body; "invoices" also matches "invoice"), '
     '"exact phrase", from:name (part of the sender address), subject:word, '
-    "is:unread, is:read, is:starred, newer_than:7d (d/w/m/y). "
+    "is:unread, is:read, is:starred, newer_than:7d, older_than:30d (d/w/m/y). "
     "Example: 'invoice from:billing is:unread'. Results are newest first and "
     "are only short previews (id, from, subject, date, snippet), not full "
     "text. Start with one or two distinctive keywords; if nothing comes back, "

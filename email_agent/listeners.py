@@ -29,7 +29,7 @@ from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
-from email_agent import actions, database
+from email_agent import actions, database, mailbox
 from email_agent.claude_json import call_claude
 from email_agent.config import PROJECT_ROOT, load_config
 
@@ -40,11 +40,15 @@ HANDLER_TIMEOUT_SECONDS = 120
 
 # ---------- loading ----------
 
-class ListenerRegistry:
-    """Keeps the listener files loaded, reloading the ones that change."""
+class ScriptRegistry:
+    """Keeps a folder of script files loaded, reloading the ones that change.
 
-    def __init__(self, folder: Path = LISTENERS_DIR, show=print):
+    `check` validates one loaded module (raises ValueError if it's wrong).
+    """
+
+    def __init__(self, folder: Path, check, show=print):
         self.folder = Path(folder)
+        self.check = check
         self.show = show
         self.modules: dict[Path, object] = {}   # file -> loaded module
         self.mtimes: dict[Path, float] = {}     # file -> last-modified time when loaded
@@ -64,42 +68,56 @@ class ListenerRegistry:
             self.mtimes[path] = mtime
             self.modules.pop(path, None)
             try:
-                self.modules[path] = _load(path)
+                self.modules[path] = _load(path, self.check)
                 self.errors.pop(path, None)
             except Exception as problem:  # a broken file shouldn't stop the others
                 self.errors[path] = f"{type(problem).__name__}: {problem}"
-                self.show(f"⚠️  listener {path.name} not loaded: {self.errors[path]}")
+                self.show(f"⚠️  {path.name} not loaded: {self.errors[path]}")
 
-    def enabled(self, event: str = "email_received") -> list:
-        """Loaded listeners that are switched on for this event."""
+    def all(self) -> list:
+        """Every script that loaded fine, after checking the folder for changes."""
         self.refresh()
-        return [m for m in self.modules.values()
-                if m.config.get("enabled", True) and m.config.get("event") == event]
+        return list(self.modules.values())
 
 
-def _load(path: Path):
-    """Import one listener file fresh and check it has what it needs."""
-    spec = importlib.util.spec_from_file_location(f"listener_{path.stem}", path)
+def _load(path: Path, check):
+    """Import one script file fresh and check it has what it needs."""
+    spec = importlib.util.spec_from_file_location(f"script_{path.parent.name}_{path.stem}", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-
     config = getattr(module, "config", None)
     if not isinstance(config, dict):
         raise ValueError("needs a `config` dict")
-    missing = {"id", "name", "enabled", "event"} - config.keys()
+    if not inspect.iscoroutinefunction(getattr(module, "handler", None)):
+        raise ValueError("needs an `async def handler(...)`")
+    check(module)
+    return module
+
+
+def _check_listener(module) -> None:
+    missing = {"id", "name", "enabled", "event"} - module.config.keys()
     if missing:
         raise ValueError(f"config is missing {sorted(missing)}")
-    if config["event"] != "email_received":
-        raise ValueError(f"unknown event {config['event']!r} (only 'email_received')")
-    if not inspect.iscoroutinefunction(getattr(module, "handler", None)):
-        raise ValueError("needs `async def handler(email, context)`")
-    return module
+    if module.config["event"] != "email_received":
+        raise ValueError(f"unknown event {module.config['event']!r} (only 'email_received')")
+
+
+class ListenerRegistry(ScriptRegistry):
+    """The listeners in scripts/listeners/."""
+
+    def __init__(self, folder: Path = LISTENERS_DIR, show=print):
+        super().__init__(folder, _check_listener, show)
+
+    def enabled(self, event: str = "email_received") -> list:
+        """Loaded listeners that are switched on for this event."""
+        return [m for m in self.all()
+                if m.config.get("enabled", True) and m.config.get("event") == event]
 
 
 # ---------- what a listener can do ----------
 
-class ListenerContext:
-    """The `context` passed to handler(email, context)."""
+class ScriptContext:
+    """The `context` passed to listener and action handlers."""
 
     def __init__(self, listener_id: str, show=print, claude_client=None):
         self.listener_id = listener_id
@@ -132,6 +150,34 @@ class ListenerContext:
         self.claude_calls.append(info)
         return answer
 
+    async def search_emails(self, query: str, limit: int = 50) -> list[dict]:
+        return await asyncio.to_thread(mailbox.search_emails, query, limit)
+
+    async def read_email(self, ids) -> list[dict]:
+        return await asyncio.to_thread(mailbox.read_email, ids)
+
+
+ListenerContext = ScriptContext  # older name
+
+
+def usage_summary(context: ScriptContext) -> dict:
+    """Claude calls, tokens and cost of one run, for the log."""
+    calls = context.claude_calls
+    return {
+        "claude_calls": len(calls),
+        "tokens_in": sum(c["input_tokens"] for c in calls),
+        "tokens_out": sum(c["output_tokens"] for c in calls),
+        "cost_usd": round(sum(c["cost_usd"] for c in calls), 6),
+    }
+
+
+def check_result(result) -> dict:
+    """Handlers must return {"executed": bool, "reason": str}."""
+    if not (isinstance(result, dict) and isinstance(result.get("executed"), bool)
+            and isinstance(result.get("reason"), str)):
+        raise ValueError(f"handler must return {{'executed': bool, 'reason': str}}, got {result!r}")
+    return result
+
 
 # ---------- running ----------
 
@@ -139,8 +185,8 @@ def log_path() -> Path:
     return load_config().data_dir / LOG_FILENAME
 
 
-def _write_log(entry: dict) -> None:
-    path = log_path()
+def write_log(entry: dict, path: Path | None = None) -> None:
+    path = path or log_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -161,25 +207,15 @@ async def run_listeners(email: dict, registry: ListenerRegistry, show=print,
             "subject": email["subject"],
         }
         try:
-            result = await asyncio.wait_for(module.handler(dict(email), context),
-                                            HANDLER_TIMEOUT_SECONDS)
-            if not (isinstance(result, dict) and isinstance(result.get("executed"), bool)
-                    and isinstance(result.get("reason"), str)):
-                raise ValueError(f"handler must return {{'executed': bool, 'reason': str}}, "
-                                 f"got {result!r}")
+            result = check_result(await asyncio.wait_for(module.handler(dict(email), context),
+                                                         HANDLER_TIMEOUT_SECONDS))
             entry.update(executed=result["executed"], reason=result["reason"])
         except Exception as problem:  # one failing listener mustn't stop the rest
             entry.update(executed=False, reason="error",
                          error=f"{type(problem).__name__}: {problem}")
-        entry.update(
-            actions=context.actions,
-            claude_calls=len(context.claude_calls),
-            tokens_in=sum(c["input_tokens"] for c in context.claude_calls),
-            tokens_out=sum(c["output_tokens"] for c in context.claude_calls),
-            cost_usd=round(sum(c["cost_usd"] for c in context.claude_calls), 6),
-            duration_ms=round((time.monotonic() - started) * 1000),
-        )
-        _write_log(entry)
+        entry.update(actions=context.actions, **usage_summary(context),
+                     duration_ms=round((time.monotonic() - started) * 1000))
+        write_log(entry)
         status = "✅" if entry["executed"] else ("❌" if "error" in entry else "➖")
         show(f"🎧 {status} {listener_id}: {entry.get('error') or entry['reason']}")
         entries.append(entry)

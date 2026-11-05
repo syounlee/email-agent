@@ -57,11 +57,29 @@ def test_options_with_approver_ask_before_changes():
         raise AssertionError("not called here")
 
     opts = build_options(load_config(), approver=approver)
-    assert opts.allowed_tools == READ_TOOLS  # only reading runs without asking
+    # only reading runs without asking; Write/Edit and mail changes go to approver
+    assert opts.allowed_tools == READ_TOOLS + ["Read", "Glob"]
+    assert opts.tools == ["Read", "Write", "Edit", "Glob"]  # no Bash, no web
     assert opts.can_use_tool is approver
     assert opts.permission_mode == "default"
     assert opts.disallowed_tools == []
     assert "approves every change" in opts.system_prompt
+    assert "listener-creator" in opts.system_prompt
+
+
+def test_chat_options_load_project_settings_skill_and_guard():
+    from email_agent.config import PROJECT_ROOT
+
+    async def approver(name, args, ctx):
+        return None
+
+    opts = build_options(load_config(), approver=approver)
+    assert opts.cwd == str(PROJECT_ROOT)
+    assert opts.setting_sources == ["project"]  # finds .claude/
+    assert opts.skills == ["listener-creator"]
+    [matcher] = opts.hooks["PreToolUse"]
+    assert matcher.matcher == "Read|Write|Edit|Glob" and matcher.on_failure == "block"
+    assert (PROJECT_ROOT / ".claude" / "skills" / "listener-creator" / "SKILL.md").exists()
 
 
 def test_seven_action_tools():

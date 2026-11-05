@@ -140,6 +140,15 @@ def test_newer_than(conn):
     assert len(search(conn, "newer_than:1w", limit=50, now=NOW)) == 15
 
 
+def test_older_than(conn):
+    old = ids(search(conn, "older_than:5d", limit=50, now=NOW))
+    assert set(old) == {"e014", "e005"}  # 2026-10-29 and 2026-10-31
+    assert ids(search(conn, "unsubscribe older_than:3d", now=NOW)) == ["e009"]
+    both = search(conn, "older_than:5d", limit=50, now=NOW) + \
+        search(conn, "newer_than:5d", limit=50, now=NOW)
+    assert len(both) == 15
+
+
 def test_forms_combine(conn):
     assert ids(search(conn, "invoice is:unread")) == ["e002"]
     assert ids(search(conn, "from:priya is:unread newer_than:3d", now=NOW)) == ["e012"]

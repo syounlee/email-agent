@@ -3,7 +3,7 @@
     uv run python -m email_agent.listen                 # MAILBOX=imap: watch Gmail
     uv run python -m email_agent.listen demo receipt    # MAILBOX=demo: fake an arrival
 
-Demo emails you can deliver: receipt, invoice, overdue, newsletter.
+Demo emails you can deliver: receipt, invoice, overdue, newsletter, bug.
 Press Ctrl+C to stop watching.
 """
 
@@ -35,6 +35,12 @@ DEMO_EMAILS = {
         subject="Payment reminder: invoice LS-77",
         body=f"Dear customer,\n\nInvoice LS-77 for $240.00 (October lawn care) was due on "
              f"{_today - timedelta(days=21)} and remains unpaid. Please pay as soon as possible.",
+    ),
+    "bug": dict(
+        sender="qa.tester@example.com",
+        subject="Bug report: export button does nothing",
+        body="Hi,\n\nFound a bug: on the Reports page, clicking Export does nothing in "
+             "Safari. Expected: a CSV download. Severity: medium.\n\nThanks,\nQA",
     ),
     "newsletter": dict(
         sender="news@gardening.example.org",
