@@ -1,4 +1,4 @@
-"""Work alerts: notify on mail from the platforms I work with. Free (no Claude).
+"""Work alerts: alert your phone about mail from the platforms I work with. Free (no Claude).
 
 Add or remove senders in WORK_SENDERS; saving the file is enough.
 Automated digests (e.g. "Your Job Digest") are skipped.
@@ -23,5 +23,6 @@ async def handler(email, context):
         return {"executed": False, "reason": "not from a work platform"}
     if SKIP_SUBJECT.search(email["subject"]):
         return {"executed": False, "reason": "automated digest, skipped"}
-    await context.notify(f"💼 Work: {email['subject']}  ({email['from']})")
-    return {"executed": True, "reason": "work mail: notified"}
+    await context.alert(email["id"], "work", f"Work: {email['subject']}"[:80],
+                        f"From {email['from']}", urgent=True)
+    return {"executed": True, "reason": "work mail: alerted"}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Email Alerts</title>
+  <link rel="icon" href="data:,">  <!-- no tab icon (avoids a 404 for /favicon.ico) -->
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>🔔 Email Alerts</h1>
+    <span id="mode" class="badge">…</span>
+    <span id="phone" class="badge">phone …</span>
+    <span id="connection" class="badge off">connecting…</span>
+    <div id="arrive" class="arrive"></div>
+  </header>
+
+  <main>
+    <!-- left: the alerts -->
+    <section class="panel alerts">
+      <div id="stats" class="stats"></div>
+      <nav id="filters" class="tabs" aria-label="Which alerts"></nav>
+      <ul id="alert-list" class="alert-list"></ul>
+    </section>
+
+    <!-- middle: the email behind the selected alert -->
+    <section class="panel middle">
+      <article id="reader" class="reader">
+        <div class="center muted">
+          <p>Important emails show up on the left, and on your phone.</p>
+          <p>Click one to see the email. <b>✅ Done</b> when handled,
+            <b>🙈 Not important</b> to teach the agent, <b>🔇 Mute</b> to never hear
+            from that sender again.</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- right: the chat -->
+    <section class="panel chat">
+      <div class="panel-head">
+        <span>Ask or tune</span>
+        <button id="new-chat" class="small" type="button">New chat</button>
+      </div>
+      <div id="chat-log" class="chat-log">
+        <div class="muted center">
+          <p>Ask about your mail or your alerts:</p>
+          <p class="examples">“What did I miss this week?”<br>“Which coupon codes do I have?”<br>
+            “Why did you alert me about the SEC email?”<br>
+            “Stop alerting me about points that expire.”</p>
+        </div>
+      </div>
+      <form id="chat-form" class="chat-form">
+        <textarea id="chat-input" rows="2" placeholder="Ask the agent… (Enter to send, Shift+Enter for a new line)"></textarea>
+        <button id="send" type="submit">Send</button>
+      </form>
+    </section>
+  </main>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+</body>
+</html>

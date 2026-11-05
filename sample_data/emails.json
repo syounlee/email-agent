@@ -6,7 +6,11 @@
     "subject": "URGENT: Board numbers needed by 3pm today",
     "date": "2026-11-05T09:12:00",
     "body": "Hi,\n\nThe board moved the review up to this afternoon. I need the updated Q3 retention figures and the confidence intervals from your churn model by 3pm today. Please send the slide deck, not just the spreadsheet.\n\nCall me if anything blocks you.\n\nDana",
-    "labels": ["inbox", "work", "important"],
+    "labels": [
+      "inbox",
+      "work",
+      "important"
+    ],
     "read": false,
     "starred": false
   },
@@ -17,7 +21,10 @@
     "subject": "Invoice #CH-2291 for October hosting",
     "date": "2026-11-04T07:30:00",
     "body": "Hello,\n\nYour invoice #CH-2291 for October 2026 is ready.\n\nAmount due: $148.00\nDue date: 2026-11-20\n\nYou can pay online from your account dashboard. Thank you for your business.\n\nCloudHost Billing",
-    "labels": ["inbox", "finance"],
+    "labels": [
+      "inbox",
+      "finance"
+    ],
     "read": false,
     "starred": false
   },
@@ -28,7 +35,10 @@
     "subject": "OVERDUE: Invoice DS-0417 - payment reminder",
     "date": "2026-11-03T16:45:00",
     "body": "Dear customer,\n\nOur records show that invoice DS-0417 for $1,250.00 (logo and branding work) was due on 2026-10-20 and is now 14 days overdue.\n\nPlease arrange payment at your earliest convenience, or reply if you believe this is an error. A late fee of 2% may apply after 30 days.\n\nKind regards,\nDesign Studio Accounts",
-    "labels": ["inbox", "finance"],
+    "labels": [
+      "inbox",
+      "finance"
+    ],
     "read": true,
     "starred": false
   },
@@ -39,9 +49,13 @@
     "subject": "Your receipt for order #BK-55102",
     "date": "2026-11-02T12:05:00",
     "body": "Thanks for your purchase!\n\nOrder #BK-55102\n- Statistical Rethinking (2nd ed.) x1 ... $62.00\n- Regression and Other Stories x1 ... $48.00\nTotal paid: $110.00 (card ending 0000)\n\nKeep this receipt for your records.",
-    "labels": ["inbox", "receipts"],
+    "labels": [
+      "inbox",
+      "receipts"
+    ],
     "read": true,
-    "starred": false
+    "starred": false,
+    "html": "<!doctype html><html><body style=\"margin:0;background:#f3f1ec;font-family:Georgia,serif\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:24px\">\n<table width=\"520\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#fff;border-radius:8px;overflow:hidden\">\n<tr><td style=\"background:#3b5b45;color:#fff;padding:18px 24px;font-size:22px\">&#128218; Example Bookshop</td></tr>\n<tr><td style=\"padding:20px 24px;font-size:15px;color:#222\">\n<p>Thanks for your purchase!</p>\n<p style=\"color:#666\">Order <b>#BK-55102</b></p>\n<table width=\"100%\" cellpadding=\"6\" style=\"border-collapse:collapse;font-size:14px\">\n<tr style=\"border-bottom:1px solid #eee\"><td>Statistical Rethinking (2nd ed.) &times; 1</td><td align=\"right\">$62.00</td></tr>\n<tr style=\"border-bottom:1px solid #eee\"><td>Regression and Other Stories &times; 1</td><td align=\"right\">$48.00</td></tr>\n<tr><td><b>Total paid</b> (card ending 0000)</td><td align=\"right\"><b>$110.00</b></td></tr>\n</table>\n<p style=\"font-size:12px;color:#888\">Keep this receipt for your records. <a href=\"https://bookshop.example.com/orders/BK-55102\">View your order</a></p>\n</td></tr></table></td></tr></table></body></html>"
   },
   {
     "id": "e005",
@@ -50,7 +64,10 @@
     "subject": "Receipt from Coffee Corner",
     "date": "2026-10-31T08:20:00",
     "body": "Thank you for visiting Coffee Corner.\n\n1 x Flat white ... $4.50\n1 x Almond croissant ... $3.75\nTotal: $8.25\n\nPaid by card. See you again soon!",
-    "labels": ["inbox", "receipts"],
+    "labels": [
+      "inbox",
+      "receipts"
+    ],
     "read": true,
     "starred": false
   },
@@ -61,7 +78,10 @@
     "subject": "Your order #BK-55102 has shipped",
     "date": "2026-11-04T10:15:00",
     "body": "Good news! Your order #BK-55102 is on its way.\n\nCarrier: Example Parcel Service\nTracking number: EPS000123456\nEstimated delivery: 2026-11-07\n\nTrack your package from your account page.",
-    "labels": ["inbox", "shipping"],
+    "labels": [
+      "inbox",
+      "shipping"
+    ],
     "read": false,
     "starred": false
   },
@@ -72,7 +92,11 @@
     "subject": "Bug report: dashboard crashes when date filter is empty",
     "date": "2026-11-04T14:50:00",
     "body": "Hi,\n\nFound a bug in the reporting dashboard.\n\nSteps to reproduce:\n1. Open the Retention tab\n2. Clear the date filter\n3. Click Refresh\n\nExpected: all dates shown.\nActual: the page shows 'Internal error 500' and the chart disappears.\n\nHappens in Chrome and Firefox. Severity: high, since the board demo uses this page.\n\nThanks,\nQA",
-    "labels": ["inbox", "work", "bugs"],
+    "labels": [
+      "inbox",
+      "work",
+      "bugs"
+    ],
     "read": false,
     "starred": false
   },
@@ -83,9 +107,13 @@
     "subject": "Data Digest #212: Bayesian A/B testing in practice",
     "date": "2026-11-05T06:00:00",
     "body": "This week in Data Digest:\n\n- Bayesian A/B testing in practice: when to stop a test\n- A gentle guide to hierarchical models\n- Job board: 14 new analytics roles\n\nYou are receiving this newsletter because you subscribed at datadigest.example.com. Unsubscribe any time.",
-    "labels": ["inbox", "newsletters"],
+    "labels": [
+      "inbox",
+      "newsletters"
+    ],
     "read": false,
-    "starred": false
+    "starred": false,
+    "html": "<!doctype html><html><body style=\"margin:0;font-family:Helvetica,Arial,sans-serif;background:#eef2f7\">\n<div style=\"max-width:560px;margin:0 auto;background:#fff\">\n<img src=\"https://placehold.co/560x120/1f3a5f/ffffff?text=Data+Digest+%23212\" width=\"560\" alt=\"Data Digest #212\" style=\"display:block;width:100%\">\n<div style=\"padding:20px 28px;color:#1d2228\">\n<h2 style=\"margin-top:0;color:#1f3a5f\">This week in Data Digest</h2>\n<ul style=\"line-height:1.7\">\n<li><a href=\"https://datadigest.example.com/212/bayes-ab\">Bayesian A/B testing in practice: when to stop a test</a></li>\n<li><a href=\"https://datadigest.example.com/212/hierarchical\">A gentle guide to hierarchical models</a></li>\n<li><a href=\"https://datadigest.example.com/jobs\">Job board: 14 new analytics roles</a></li>\n</ul>\n<p style=\"font-size:12px;color:#888;border-top:1px solid #eee;padding-top:12px\">You are receiving this newsletter because you subscribed at datadigest.example.com. <a href=\"https://datadigest.example.com/unsubscribe\">Unsubscribe</a> any time.</p>\n</div></div></body></html>"
   },
   {
     "id": "e009",
@@ -94,7 +122,10 @@
     "subject": "Weekend Hikes newsletter: autumn trails",
     "date": "2026-11-01T09:00:00",
     "body": "Autumn is here! Our favourite trails for falling leaves, a packing checklist for cold mornings, and the dates for our November group walks.\n\nUnsubscribe from this newsletter at any time from your profile.",
-    "labels": ["inbox", "newsletters"],
+    "labels": [
+      "inbox",
+      "newsletters"
+    ],
     "read": true,
     "starred": false
   },
@@ -105,7 +136,10 @@
     "subject": "Q4 planning offsite - venue options",
     "date": "2026-11-02T11:00:00",
     "body": "Hi both,\n\nI shortlisted two venues for the Q4 planning offsite on 2026-11-19:\n- Riverside Hall (seats 30, $900/day)\n- The Old Library (seats 20, $650/day)\n\nWhich do you prefer? I need to book by Friday.\n\nPriya",
-    "labels": ["inbox", "work"],
+    "labels": [
+      "inbox",
+      "work"
+    ],
     "read": true,
     "starred": false
   },
@@ -116,7 +150,10 @@
     "subject": "Re: Q4 planning offsite - venue options",
     "date": "2026-11-02T15:30:00",
     "body": "Hi Priya,\n\nThe Old Library works for me. We will be about 18 people, so 20 seats is enough and it is cheaper.\n\nThanks for organising!\n\n> I shortlisted two venues for the Q4 planning offsite...",
-    "labels": ["sent", "work"],
+    "labels": [
+      "sent",
+      "work"
+    ],
     "read": true,
     "starred": false
   },
@@ -127,7 +164,10 @@
     "subject": "Re: Q4 planning offsite - venue options",
     "date": "2026-11-03T09:40:00",
     "body": "Great, booked The Old Library for 2026-11-19, 9am to 5pm. Could you prepare a 20-minute talk on the churn model results?\n\nPriya\n\n> The Old Library works for me...",
-    "labels": ["inbox", "work"],
+    "labels": [
+      "inbox",
+      "work"
+    ],
     "read": false,
     "starred": false
   },
@@ -138,7 +178,11 @@
     "subject": "Invitation: Weekly analytics sync (Mon 10:00)",
     "date": "2026-11-03T08:00:00",
     "body": "You have been invited to: Weekly analytics sync\nWhen: Mondays, 10:00-10:30\nWhere: Room 4B / video call\nOrganizer: dana.manager@example.com\n\nAccept / Decline / Maybe",
-    "labels": ["inbox", "work", "calendar"],
+    "labels": [
+      "inbox",
+      "work",
+      "calendar"
+    ],
     "read": true,
     "starred": false
   },
@@ -149,7 +193,10 @@
     "subject": "Reminder: benefits enrollment closes 2026-11-15",
     "date": "2026-10-29T13:00:00",
     "body": "Hello,\n\nThis is a reminder that open enrollment for health and retirement benefits closes on 2026-11-15. If you do nothing, your current choices carry over.\n\nHR Team",
-    "labels": ["inbox", "hr"],
+    "labels": [
+      "inbox",
+      "hr"
+    ],
     "read": true,
     "starred": true
   },
@@ -160,7 +207,10 @@
     "subject": "Lunch on Saturday?",
     "date": "2026-11-04T19:25:00",
     "body": "Hey! Are you free for lunch this Saturday? There is a new noodle place near the station. 12:30 works for me.\n\nSam",
-    "labels": ["inbox", "personal"],
+    "labels": [
+      "inbox",
+      "personal"
+    ],
     "read": false,
     "starred": false
   }

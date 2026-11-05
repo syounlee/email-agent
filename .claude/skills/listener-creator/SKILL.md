@@ -1,6 +1,6 @@
 ---
 name: listener-creator
-description: Write email listeners (scripts that run automatically on every new email, e.g. "notify me when...", "label emails from...") and one-click actions (scripts the user runs with /run, e.g. "archive old newsletters"). Use whenever the user asks to automate something about their mail.
+description: Write email listeners (scripts that run automatically on every new email, e.g. "alert me when...", "tell me if...", "label emails from...") and one-click actions (scripts the user runs with /run, e.g. "archive old newsletters"). Use whenever the user asks to automate something about their mail.
 ---
 
 # Writing listeners and actions
@@ -26,7 +26,12 @@ async def handler(email, context):
 `email` is a dict: `id, from, to, subject, date, body, labels, read, starred`.
 
 `context` (all `await`ed):
-- `await context.notify(message)` - show the user a 🔔 message
+- `await context.notify(message)` - show the user a 🔔 message (web page and terminal only)
+- `await context.alert(email_id, kind, title, message, urgent=False)` - reach the user's
+  PHONE: urgent=True pushes now, otherwise it goes in the morning summary. kind is
+  "action", "coupon", "money" or "security". Use this when the user says "tell me",
+  "alert me" or "let me know" about something they'd want to hear while away; keep
+  urgent for things that can't wait a day. Never put login codes in it.
 - `await context.star_email(email["id"])`, `await context.archive_email(email["id"])`
 - `await context.add_label(email["id"], "Label")` - user labels only, never `\Trash` etc.
 - `await context.call_claude(prompt, schema, model="haiku")` - one Claude call that returns
@@ -42,14 +47,15 @@ Rules:
 ### Template 1: keyword check, no Claude (free)
 
 ```python
-config = {"id": "notify-from-boss", "name": "Notify me about mail from my boss",
+config = {"id": "alert-from-boss", "name": "Alert me about mail from my boss",
           "enabled": True, "event": "email_received"}
 
 async def handler(email, context):
     if "boss@example.com" not in email["from"].lower():
         return {"executed": False, "reason": "not from my boss"}
-    await context.notify(f"Mail from your boss: {email['subject']}")
-    return {"executed": True, "reason": "notified"}
+    await context.alert(email["id"], "work", "Mail from your boss", email["subject"],
+                        urgent=True)
+    return {"executed": True, "reason": "alerted"}
 ```
 
 ### Template 2: let Claude decide

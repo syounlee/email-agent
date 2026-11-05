@@ -1,4 +1,4 @@
-"""Flight price watch: notify when a tracked Google Flights price is low. Free.
+"""Flight price watch: alert your phone when a tracked Google Flights price is low. Free.
 
 Google Flights emails look like:
     "Your tracked route: Seoul to Tokyo flights from ₩195k"
@@ -42,5 +42,6 @@ async def handler(email, context):
     if price > MAX_PRICE_WON:
         return {"executed": False, "reason": f"₩{price:,} is above ₩{MAX_PRICE_WON:,}"}
     await context.star_email(email["id"])
-    await context.notify(f"✈️ Price drop: {subject}  (target ₩{MAX_PRICE_WON:,})")
-    return {"executed": True, "reason": f"₩{price:,} ≤ ₩{MAX_PRICE_WON:,}: starred and notified"}
+    await context.alert(email["id"], "travel", f"Flight price drop: ₩{price:,}",
+                        f"{subject} (your target: ₩{MAX_PRICE_WON:,})", urgent=True)
+    return {"executed": True, "reason": f"₩{price:,} ≤ ₩{MAX_PRICE_WON:,}: starred and alerted"}

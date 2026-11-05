@@ -9,7 +9,7 @@ import re
 config = {
     "id": "security-alerts",
     "name": "Star and notify on security alerts",
-    "enabled": True,
+    "enabled": False,  # replaced by important_mail.py (phone alerts)
     "event": "email_received",
 }
 

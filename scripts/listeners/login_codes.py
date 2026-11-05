@@ -9,7 +9,7 @@ import re
 config = {
     "id": "login-codes",
     "name": "Notify when a login or verification code arrives",
-    "enabled": True,
+    "enabled": False,  # off: only a web-page notice; you are waiting for the code anyway
     "event": "email_received",
 }
 
