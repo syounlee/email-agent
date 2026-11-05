@@ -22,6 +22,7 @@ DEFAULT_IMAP_HOST = "imap.gmail.com"
 DEFAULT_IMAP_FOLDER = "INBOX"
 DEFAULT_SYNC_MAX_EMAILS = 30
 DEFAULT_SYNC_DAYS = 7
+DEFAULT_PORT = 3000
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,7 @@ class Config:
     imap_folder: str = DEFAULT_IMAP_FOLDER
     sync_max_emails: int = DEFAULT_SYNC_MAX_EMAILS
     sync_days: int = DEFAULT_SYNC_DAYS
+    port: int = DEFAULT_PORT  # the local web server (step 9)
 
     @property
     def has_api_key(self) -> bool:
@@ -80,4 +82,5 @@ def load_config(env_file: Path | None = None) -> Config:
         imap_folder=getenv("IMAP_FOLDER") or DEFAULT_IMAP_FOLDER,
         sync_max_emails=int(getenv("SYNC_MAX_EMAILS") or DEFAULT_SYNC_MAX_EMAILS),
         sync_days=int(getenv("SYNC_DAYS") or DEFAULT_SYNC_DAYS),
+        port=int(getenv("PORT") or DEFAULT_PORT),
     )

@@ -258,14 +258,40 @@ async def run_listeners(email: dict, registry: ListenerRegistry, show=print,
     return entries
 
 
-async def process_pending(registry: ListenerRegistry, show=print, claude_client=None) -> list[dict]:
-    """Run the listeners on every email still waiting for them, then unmark it."""
+def read_log(listener_id: str | None = None, limit: int = 50) -> list[dict]:
+    """The newest `limit` runs from the listener log (optionally for one listener)."""
+    path = log_path()
+    if not path.exists():
+        return []
+    entries = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue  # a half-written line; skip it
+        if listener_id is None or entry.get("listener") == listener_id:
+            entries.append(entry)
+    return entries[-limit:]
+
+
+async def process_pending(registry: ListenerRegistry, show=print, claude_client=None,
+                          on_email=None, on_entries=None) -> list[dict]:
+    """Run the listeners on every email still waiting for them, then unmark it.
+
+    on_email(email) and on_entries(email, entries): optional async callbacks,
+    used by the web server to tell browsers what happened.
+    """
     with closing(database.open_db()) as conn:
         waiting = database.pending_for_listeners(conn)
     entries = []
     for email in waiting:
         show(f"📨 new: {email['subject']}  ({email['from']})")
-        entries += await run_listeners(email, registry, show, claude_client)
+        if on_email:
+            await on_email(email)
+        these = await run_listeners(email, registry, show, claude_client)
+        if on_entries:
+            await on_entries(email, these)
+        entries += these
         with closing(database.open_db()) as conn:
             database.mark_listened(conn, email["id"])
     return entries
@@ -273,13 +299,8 @@ async def process_pending(registry: ListenerRegistry, show=print, claude_client=
 
 # ---------- demo mode: pretend an email just arrived ----------
 
-async def deliver_demo_email(sender: str, subject: str, body: str, *, to: str = "me@example.com",
-                             registry: ListenerRegistry | None = None, show=print,
-                             claude_client=None) -> tuple[str, list[dict]]:
-    """Add an email to the demo mailbox as if it just arrived, and run the listeners.
-
-    Returns (email_id, log entries).
-    """
+def add_demo_email(sender: str, subject: str, body: str, *, to: str = "me@example.com") -> str:
+    """Put an email into the demo mailbox as new mail (waiting for the listeners)."""
     if load_config().mailbox != "demo":
         raise RuntimeError("deliver_demo_email only works with MAILBOX=demo")
     email = {
@@ -290,5 +311,16 @@ async def deliver_demo_email(sender: str, subject: str, body: str, *, to: str = 
     }
     with closing(database.open_db()) as conn:
         database.add_emails(conn, [email], pending=True)
+    return email["id"]
+
+
+async def deliver_demo_email(sender: str, subject: str, body: str, *, to: str = "me@example.com",
+                             registry: ListenerRegistry | None = None, show=print,
+                             claude_client=None) -> tuple[str, list[dict]]:
+    """Add an email to the demo mailbox as if it just arrived, and run the listeners.
+
+    Returns (email_id, log entries).
+    """
+    email_id = add_demo_email(sender, subject, body, to=to)
     entries = await process_pending(registry or ListenerRegistry(show=show), show, claude_client)
-    return email["id"], entries
+    return email_id, entries

@@ -303,6 +303,20 @@ def update_state(conn: sqlite3.Connection, email_id: str, *, read: bool,
     conn.commit()
 
 
+def inbox(conn: sqlite3.Connection, limit: int = 50) -> list[dict]:
+    """Emails still in the inbox (not archived), newest first, as short previews."""
+    rows = conn.execute(
+        "SELECT * FROM emails WHERE lower(labels) LIKE '%inbox%' ORDER BY date DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return [
+        {"id": r["id"], "from": r["sender"], "subject": r["subject"], "date": r["date"],
+         "snippet": _make_snippet(r["body"], ""), "labels": json.loads(r["labels"]),
+         "read": bool(r["read"]), "starred": bool(r["starred"])}
+        for r in rows
+    ]
+
+
 def read(conn: sqlite3.Connection, ids: list[str]) -> list[dict]:
     """Full emails for the given ids, in the order asked. Unknown ids are skipped."""
     marks = ",".join("?" * len(ids))

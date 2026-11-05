@@ -73,7 +73,16 @@ def parse_run_command(text: str) -> tuple[str, dict[str, str]]:
     return parts[1], raw
 
 
-def _convert(name: str, kind: str, value: str):
+def _convert(name: str, kind: str, value):
+    # Values from JSON (the web server) may already have the right type.
+    if not isinstance(value, str):
+        if kind == "boolean" and isinstance(value, bool):
+            return value
+        if kind == "integer" and isinstance(value, int) and not isinstance(value, bool):
+            return value
+        if kind == "number" and isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+        value = str(value)
     try:
         if kind == "integer":
             return int(value)
@@ -122,8 +131,14 @@ def describe(registry: ActionRegistry) -> str:
 async def run_action(command: str, registry: ActionRegistry | None = None, show=print,
                      claude_client=None) -> dict:
     """Run '/run <id> key=value ...'. Returns (and logs) one entry."""
-    registry = registry or ActionRegistry(show=show)
     action_id, raw = parse_run_command(command)
+    return await run_action_with_params(action_id, raw, registry, show, claude_client)
+
+
+async def run_action_with_params(action_id: str, raw: dict, registry: ActionRegistry | None = None,
+                                 show=print, claude_client=None) -> dict:
+    """Run one action with parameters given as a dict (strings or proper values)."""
+    registry = registry or ActionRegistry(show=show)
     module = registry.get(action_id)
     params = build_params(module.config["parameters"], raw)
 
