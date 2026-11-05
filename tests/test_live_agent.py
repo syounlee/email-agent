@@ -20,3 +20,21 @@ async def test_overdue_invoice_question_searches_then_reads():
     assert "e003" in read_ids  # the overdue Design Studio invoice
     assert "DS-0417" in answer.text
     assert answer.cost_usd > 0
+
+
+async def test_chat_follow_up_uses_earlier_answer():
+    from claude_agent_sdk import ClaudeSDKClient
+
+    from email_agent.agent import build_options
+    from email_agent.chat import answer_one
+
+    async with ClaudeSDKClient(options=build_options()) as client:
+        first = await answer_one(client, "Who sent the urgent email?", show=lambda _: None)
+        second = await answer_one(client, "What exactly do they need?", show=lambda _: None)
+
+    assert "dana" in first.result.lower()
+    # "they" only makes sense if Claude remembers the first answer
+    text = second.result.lower()
+    assert "3pm" in text or "3 pm" in text
+    assert "slide" in text or "retention" in text
+    assert second.total_cost_usd > first.total_cost_usd  # running total grows
