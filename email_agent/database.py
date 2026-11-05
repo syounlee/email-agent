@@ -149,6 +149,7 @@ def _row_to_email(row: sqlite3.Row) -> dict:
         "starred": bool(row["starred"]),
         "folder": row["folder"],
         "uid": row["uid"],
+        "uidvalidity": row["uidvalidity"],
     }
 
 
@@ -260,6 +261,16 @@ def search(conn: sqlite3.Connection, query: str, limit: int = 10,
         }
         for r in rows
     ]
+
+
+def update_state(conn: sqlite3.Connection, email_id: str, *, read: bool,
+                 starred: bool, labels: list[str]) -> None:
+    """Save an email's read/starred status and labels."""
+    conn.execute(
+        "UPDATE emails SET read = ?, starred = ?, labels = ? WHERE id = ?",
+        (int(read), int(starred), json.dumps(labels), email_id),
+    )
+    conn.commit()
 
 
 def read(conn: sqlite3.Connection, ids: list[str]) -> list[dict]:

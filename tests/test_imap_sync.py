@@ -165,10 +165,13 @@ class FakeServer:
         self.calls.append(("search", criteria))
         return list(self.messages)
 
+    def has_capability(self, name):
+        return name == "X-GM-EXT-1"  # behaves like Gmail
+
     def fetch(self, uids, items):
         self.calls.append(("fetch", sorted(uids), items))
         return {u: {b"BODY[]": self.messages[u], b"FLAGS": (), b"INTERNALDATE": None,
-                    b"SEQ": u} for u in uids}
+                    b"X-GM-LABELS": (b"\\Important", "Work"), b"SEQ": u} for u in uids}
 
     # These would change mail. The sync must never call them.
     def add_flags(self, *a, **k): raise AssertionError("sync tried to change flags")
@@ -210,10 +213,15 @@ def test_sync_is_read_only_and_takes_newest(imap_config, imap_db):
     assert result == {"found": 3, "already_stored": 0, "added": 3}
 
 
-def test_sync_stores_uid_and_folder(imap_config, imap_db):
-    sync(imap_config, imap_db, connect=lambda cfg: FakeServer(_numbered(1)))
+def test_sync_stores_uid_folder_and_gmail_labels(imap_config, imap_db):
+    server = FakeServer(_numbered(1))
+    sync(imap_config, imap_db, connect=lambda cfg: server)
     [email] = database.read(imap_db, ["<msg-1@example.com>"])
-    assert (email["uid"], email["folder"]) == (101, "INBOX")
+    assert (email["uid"], email["folder"], email["uidvalidity"]) == (101, "INBOX", 77)
+    # Gmail omits the label of the open folder, so \\Inbox is added back
+    assert email["labels"] == ["\\Inbox", "\\Important", "Work"]
+    [fetch] = [c for c in server.calls if c[0] == "fetch"]
+    assert "X-GM-LABELS" in fetch[2]
     assert database.stored_uids(imap_db, "INBOX", 77) == {101}
 
 

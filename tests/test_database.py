@@ -106,7 +106,7 @@ def test_is_unread_and_is_read(conn):
 
 
 def test_is_starred(conn):
-    assert ids(search(conn, "is:starred")) == ["e001"]
+    assert ids(search(conn, "is:starred")) == ["e014"]
 
 
 def test_newer_than(conn):

@@ -62,5 +62,5 @@ def test_read_email_many_ids_keeps_order_and_skips_unknown():
 
 def test_read_email_gives_booleans_not_numbers():
     [email] = read_email("e001")
-    assert email["read"] is False and email["starred"] is True
+    assert email["read"] is False and email["starred"] is False
     assert email["labels"] == ["inbox", "work", "important"]

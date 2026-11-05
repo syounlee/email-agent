@@ -8,7 +8,7 @@
     "body": "Hi,\n\nThe board moved the review up to this afternoon. I need the updated Q3 retention figures and the confidence intervals from your churn model by 3pm today. Please send the slide deck, not just the spreadsheet.\n\nCall me if anything blocks you.\n\nDana",
     "labels": ["inbox", "work", "important"],
     "read": false,
-    "starred": true
+    "starred": false
   },
   {
     "id": "e002",
@@ -151,7 +151,7 @@
     "body": "Hello,\n\nThis is a reminder that open enrollment for health and retirement benefits closes on 2026-11-15. If you do nothing, your current choices carry over.\n\nHR Team",
     "labels": ["inbox", "hr"],
     "read": true,
-    "starred": false
+    "starred": true
   },
   {
     "id": "e015",

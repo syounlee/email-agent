@@ -93,7 +93,8 @@ def _local_iso(value: datetime) -> str:
 
 
 def parse_email(raw: bytes, *, uid: int | None = None, folder: str | None = None,
-                uidvalidity: int | None = None, flags=(), internal_date=None) -> dict:
+                uidvalidity: int | None = None, flags=(), internal_date=None,
+                gmail_labels=None) -> dict:
     """Turn raw email bytes into a dict shaped like the sample emails."""
     msg = email.message_from_bytes(raw, policy=policy.default)
 
@@ -118,6 +119,13 @@ def parse_email(raw: bytes, *, uid: int | None = None, folder: str | None = None
                       else f"<sha1-{hashlib.sha1(raw).hexdigest()}>")
 
     flags = {f.decode() if isinstance(f, bytes) else str(f) for f in flags}
+    if gmail_labels is not None:  # Gmail's own labels, e.g. \\Inbox, \\Important, Work
+        labels = [l.decode("utf-8", "replace") if isinstance(l, bytes) else str(l)
+                  for l in gmail_labels]
+        if folder and folder.upper() == "INBOX" and not any(l.lower() == "\\inbox" for l in labels):
+            labels.insert(0, "\\Inbox")  # Gmail leaves out the label of the open folder
+    else:
+        labels = [folder] if folder else []
     return {
         "id": message_id,
         "from": header("From"),
@@ -125,7 +133,7 @@ def parse_email(raw: bytes, *, uid: int | None = None, folder: str | None = None
         "subject": header("Subject") or "(no subject)",
         "date": _local_iso(when),
         "body": extract_body(msg),
-        "labels": [folder] if folder else [],
+        "labels": labels,
         "read": "\\Seen" in flags,
         "starred": "\\Flagged" in flags,
         "folder": folder,
@@ -171,7 +179,10 @@ def sync(config: Config | None = None, conn=None, connect=_connect, today: date 
             emails = []
             if to_fetch:
                 # BODY.PEEK[] reads the whole message WITHOUT setting the \Seen flag.
-                fetched = server.fetch(to_fetch, ["BODY.PEEK[]", "FLAGS", "INTERNALDATE"])
+                items = ["BODY.PEEK[]", "FLAGS", "INTERNALDATE"]
+                if server.has_capability("X-GM-EXT-1"):  # Gmail: also get its labels
+                    items.append("X-GM-LABELS")
+                fetched = server.fetch(to_fetch, items)
                 for uid, data in fetched.items():
                     raw = data.get(b"BODY[]")  # the server answers PEEK as BODY[]
                     if raw is None:
@@ -179,6 +190,7 @@ def sync(config: Config | None = None, conn=None, connect=_connect, today: date 
                     emails.append(parse_email(
                         raw, uid=uid, folder=config.imap_folder, uidvalidity=uidvalidity,
                         flags=data.get(b"FLAGS", ()), internal_date=data.get(b"INTERNALDATE"),
+                        gmail_labels=data.get(b"X-GM-LABELS"),
                     ))
             added = database.add_emails(conn, emails)
     finally:

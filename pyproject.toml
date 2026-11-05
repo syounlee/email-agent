@@ -21,6 +21,10 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = ["live: calls Claude (costs money); run only with --live"]
+filterwarnings = [
+    # search/read run without asking on purpose; only changes need approval
+    "ignore::claude_agent_sdk.CanUseToolShadowedWarning",
+]
 
 [dependency-groups]
 dev = [

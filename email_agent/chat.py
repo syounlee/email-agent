@@ -4,15 +4,27 @@
 
 One ClaudeSDKClient stays open for the whole chat, so Claude remembers
 earlier questions and answers. Type "exit" (or press Ctrl+C) to stop.
+
+Before any change to your mail (archive, star, labels...), the chat asks
+"Allow ...? (y/n)". Only "y" or "yes" lets it run.
 """
 
 import asyncio
+import warnings
 
-from claude_agent_sdk import AssistantMessage, ClaudeSDKClient, ResultMessage, ToolUseBlock
+from claude_agent_sdk import (
+    AssistantMessage, CanUseToolShadowedWarning, ClaudeSDKClient, PermissionResultAllow,
+    PermissionResultDeny, ResultMessage, ToolUseBlock,
+)
 
+from email_agent.actions import approval_question
 from email_agent.agent import build_options
 from email_agent.config import load_config
 from email_agent.mailbox import prepare
+from email_agent.tools import READ_TOOLS, TOOL_TO_ACTION
+
+# The SDK warns that search/read skip the approval check. That's on purpose.
+warnings.filterwarnings("ignore", category=CanUseToolShadowedWarning)
 
 EXIT_WORDS = {"exit", "quit", "bye"}
 
@@ -24,7 +36,35 @@ def describe_tool_call(name: str, args: dict) -> str:
         return f"🔎 search: {args.get('query', '')}"
     if short == "read_email":
         return f"📖 read: {', '.join(args.get('ids', []))}"
-    return f"🔧 {short}: {args}"
+    if "label" in args:
+        return f"✏️  {short}: {args.get('id', '')} → {args['label']}"
+    return f"✏️  {short}: {args.get('id', '')}"
+
+
+def make_approver(read_input=input, show=print, question_for=approval_question):
+    """Build the can_use_tool callback: ask the user before any mail change."""
+
+    async def approve(tool_name: str, tool_input: dict, context):
+        if tool_name in READ_TOOLS:  # normally never asked (they're pre-allowed)
+            return PermissionResultAllow()
+        action = TOOL_TO_ACTION.get(tool_name)
+        if action is None:
+            return PermissionResultDeny(message=f"{tool_name} is not allowed.")
+
+        question = question_for(action, tool_input.get("id", ""), tool_input.get("label"))
+        try:
+            reply = read_input(f"   ❓ {question} (y/n) ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            reply = "n"
+        if reply in ("y", "yes"):
+            return PermissionResultAllow()
+        show("   🚫 not done")
+        return PermissionResultDeny(
+            message="The user declined this change. Nothing was changed. "
+                    "Tell them it was not done and do not retry unless they ask."
+        )
+
+    return approve
 
 
 async def answer_one(client, question: str, show=print) -> ResultMessage | None:
@@ -79,7 +119,8 @@ async def main() -> None:
     print(f"Email agent chat ({config.model}, budget ${config.max_budget_usd:.2f}). "
           'Type "exit" or press Ctrl+C to stop.')
     prepare(config)
-    async with ClaudeSDKClient(options=build_options(config)) as client:
+    options = build_options(config, approver=make_approver())
+    async with ClaudeSDKClient(options=options) as client:
         await chat_loop(client, budget_usd=config.max_budget_usd)
 
 

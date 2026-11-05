@@ -38,3 +38,37 @@ async def test_chat_follow_up_uses_earlier_answer():
     assert "3pm" in text or "3 pm" in text
     assert "slide" in text or "retention" in text
     assert second.total_cost_usd > first.total_cost_usd  # running total grows
+
+
+async def _star_the_urgent_email(reply: str):
+    from claude_agent_sdk import ClaudeSDKClient
+
+    from email_agent.agent import build_options
+    from email_agent.chat import answer_one, make_approver
+    from email_agent.mailbox import read_email
+
+    asked = []
+
+    def read_input(prompt):
+        asked.append(prompt)
+        return reply
+
+    tools = []
+    options = build_options(approver=make_approver(read_input, show=lambda _: None))
+    async with ClaudeSDKClient(options=options) as client:
+        result = await answer_one(client, "Star the urgent email.", show=tools.append)
+    return asked, tools, result, read_email("e001")[0]
+
+
+async def test_chat_star_with_approval():
+    asked, tools, result, email = await _star_the_urgent_email("y")
+    assert asked == ["   ❓ Allow star of 'URGENT: Board numbers needed by 3pm today'? (y/n) "]
+    assert any("star_email: e001" in t for t in tools)
+    assert email["starred"] is True
+
+
+async def test_chat_star_declined_changes_nothing():
+    asked, tools, result, email = await _star_the_urgent_email("n")
+    assert len(asked) >= 1
+    assert email["starred"] is False
+    assert "not" in result.result.lower()  # tells the user it wasn't done

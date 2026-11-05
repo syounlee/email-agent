@@ -71,3 +71,52 @@ async def test_chat_ends_when_budget_cap_is_hit():
     await chat_loop(client, _inputs("a big question", "never asked"), out.append, budget_usd=0.5)
     assert any("Budget cap reached" in line for line in out)
     assert client.questions == ["a big question"]
+
+
+# ---------- asking before changes ----------
+
+from claude_agent_sdk import PermissionResultAllow, PermissionResultDeny
+
+from email_agent.chat import make_approver
+
+
+def _approver(reply):
+    asked, shown = [], []
+
+    def read_input(prompt):
+        asked.append(prompt)
+        if isinstance(reply, BaseException):
+            raise reply
+        return reply
+
+    approve = make_approver(read_input, shown.append,
+                            question_for=lambda action, i, label: f"Allow {action} of 'S'?")
+    return approve, asked, shown
+
+
+async def test_yes_allows_the_change():
+    approve, asked, _ = _approver("y")
+    result = await approve("mcp__email__archive_email", {"id": "e001"}, None)
+    assert isinstance(result, PermissionResultAllow)
+    assert asked == ["   ❓ Allow archive of 'S'? (y/n) "]
+
+
+async def test_anything_but_yes_declines():
+    for reply in ["n", "", "maybe", "no", KeyboardInterrupt()]:
+        approve, _, shown = _approver(reply)
+        result = await approve("mcp__email__star_email", {"id": "e001"}, None)
+        assert isinstance(result, PermissionResultDeny)
+        assert "declined" in result.message
+
+
+async def test_unknown_tools_are_denied_without_asking():
+    approve, asked, _ = _approver("y")
+    result = await approve("Bash", {"command": "rm -rf /"}, None)
+    assert isinstance(result, PermissionResultDeny)
+    assert asked == []
+
+
+def test_describe_change_tool_calls():
+    assert describe_tool_call("mcp__email__star_email", {"id": "e001"}) == "✏️  star_email: e001"
+    assert describe_tool_call("mcp__email__add_label", {"id": "e4", "label": "Books"}) == \
+        "✏️  add_label: e4 → Books"
