@@ -60,6 +60,7 @@ from email_agent.mail.idle_watcher import start_watcher
 from email_agent.mail.imap_sync import sync
 from email_agent.automation.listen import DEMO_EMAILS
 from email_agent.automation import alerts
+from email_agent.core.watch_lock import WatchLock
 from email_agent.automation.listeners import ListenerRegistry, add_demo_email, process_pending, read_log
 from email_agent.agent.tools import READ_TOOLS, TOOL_TO_ACTION
 from email_agent.automation.user_actions import ActionInputError, ActionRegistry, run_action_with_params
@@ -298,7 +299,7 @@ async def get_alerts(request: Request):
     config = state_of(request).config
     return JSONResponse({"status": status, "alerts": found, "stats": numbers,
                          "phone": bool(config.ntfy_topic), "mailbox": config.mailbox,
-                         "summary_hour": config.summary_hour})
+                         "summary_schedule": config.summary_schedule})
 
 
 async def post_alert(request: Request):
@@ -546,7 +547,15 @@ def create_app(config: Config | None = None, *, chat_turn=None, sync_fn=sync,
         log(f"mailbox: {config.mailbox} | listeners on: {', '.join(enabled) or 'none'}")
         background, watcher = [], None
         can_watch = config.mailbox == "imap" and config.email_address and config.email_app_password
-        if start_watcher_thread and can_watch:
+        lock = WatchLock(config)
+        watch_here = start_watcher_thread  # tests pass False: no Gmail, no summaries
+        if watch_here and can_watch and not lock.acquire():
+            # email-watch (perhaps auto-started at login) already watches Gmail and
+            # sends the alerts; this page then only shows them.
+            log(f"email-watch is already watching Gmail (process {lock.holder()}); "
+                "this page shows its alerts")
+            watch_here = False
+        if watch_here and can_watch:
             async def safe_sync():
                 try:
                     await state.sync_and_process()
@@ -561,7 +570,7 @@ def create_app(config: Config | None = None, *, chat_turn=None, sync_fn=sync,
 
             background.append(asyncio.create_task(safe_sync()))  # catch up first
             watcher = start_watcher(config, on_new_mail, show=log)
-        if start_watcher_thread:  # the morning summary, after the catch-up is done
+        if watch_here:  # the summaries, after the catch-up is done
             first = background[0] if background else None
             background.append(asyncio.create_task(alerts.summary_loop(first, show=log)))
         log("phone alerts: " + ("on" if config.ntfy_topic else "off (set NTFY_TOPIC in .env)"))
@@ -572,6 +581,7 @@ def create_app(config: Config | None = None, *, chat_turn=None, sync_fn=sync,
                 thread, stop = watcher
                 stop.set()
                 await asyncio.to_thread(thread.join, 5)
+            lock.release()
             for task in background:
                 task.cancel()
             for browser in list(state.browsers):

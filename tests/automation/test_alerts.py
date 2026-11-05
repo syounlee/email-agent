@@ -159,3 +159,33 @@ def test_status_mute_feedback_and_stats():
     assert alerts.send_summary() == 0  # handled alerts stay out of the summary
     with pytest.raises(ValueError):
         alerts.set_status(book["num"], "maybe")
+
+
+def test_hourly_summaries_between_8_and_22(phone, monkeypatch):
+    monkeypatch.setenv("SUMMARY_HOURS", "8-22")
+    at = lambda h, m=5: datetime(2026, 11, 6, h, m)
+    alerts.add_alert("e001", "money", "Refund", "₩12,000", urgent=False, pushed=False)
+    assert alerts.maybe_send_summary(now=at(7)) == 0       # before 8: waits
+    assert alerts.maybe_send_summary(now=at(8)) == 1
+    alerts.add_alert("e002", "coupon", "Code", "SAVE10", urgent=False, pushed=False)
+    assert alerts.maybe_send_summary(now=at(8, 40)) == 0   # once per hour
+    assert alerts.maybe_send_summary(now=at(9)) == 1       # next hour: the new one
+    assert alerts.maybe_send_summary(now=at(10)) == 0      # nothing new: nothing sent
+    assert len(phone.sent) == 2
+    alerts.add_alert("e003", "action", "Confirm", "link", urgent=False, pushed=False)
+    assert alerts.maybe_send_summary(now=at(23)) == 0      # 23:00 is after 22: waits...
+    assert alerts.maybe_send_summary(now=datetime(2026, 11, 7, 2)) == 0  # ...all night
+    assert alerts.maybe_send_summary(now=datetime(2026, 11, 7, 8, 1)) == 1
+
+
+def test_summary_hours_setting():
+    from email_agent.core.config import describe_hours, parse_hours
+    assert parse_hours("8") == (8,)
+    assert parse_hours("8-22") == tuple(range(8, 23))
+    assert parse_hours("8, 13,18") == (8, 13, 18)
+    assert describe_hours(parse_hours("8-22")) == "every hour from 8:00 to 22:00"
+    assert describe_hours((8,)) == "at 8:00"
+    assert describe_hours((8, 13, 18)) == "at 8:00, 13:00, 18:00"
+    for bad in ("25", "22-8", "", "x"):
+        with pytest.raises(ValueError):
+            parse_hours(bad)

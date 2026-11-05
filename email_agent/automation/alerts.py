@@ -2,7 +2,8 @@
 
 A listener calls  await context.alert(email_id, kind, title, message, urgent=...)
 - urgent=True: pushed to your phone right away,
-- urgent=False: saved for the morning summary (one push with everything).
+- urgent=False: saved for the next summary (one push with everything waiting),
+  sent at the SUMMARY_HOURS in .env, e.g. every hour from 8:00 to 22:00.
 Every alert is also kept in the database. On the web page you mark each one
 Done, Not important (the listener learns from these) or Mute sender.
 
@@ -12,7 +13,7 @@ The topic works like a password, so it is never printed.
 
     uv run email-alerts            # the newest alerts
     uv run email-alerts test       # send a test message to your phone
-    uv run email-alerts summary    # send the morning summary now
+    uv run email-alerts summary    # send the summary now
     uv run email-alerts check 200  # check the 200 newest stored emails for alerts
                                    # (for real: stars and labels them in Gmail)
 """
@@ -254,31 +255,49 @@ def send_summary(config: Config | None = None, today: date | None = None, post=N
         conn.executemany("UPDATE alerts SET summarized = ? WHERE num = ?",
                          [(today.isoformat(), i["num"]) for i in items])
         conn.commit()
-    show(f"📬 morning summary sent ({len(items)} alerts)")
+    show(f"📬 summary sent ({len(items)} alerts)")
     return len(items)
 
 
+def current_slot(config: Config, now: datetime) -> str | None:
+    """The latest scheduled summary hour that has started today, e.g. '2026-11-06T14'.
+
+    None when nothing should go out now: before the first hour of the day, and,
+    with several hours (e.g. 8-22), after the last one: the night stays quiet.
+    With one hour a day (e.g. 8), starting the agent later still sends it.
+    """
+    hours = config.summary_hours
+    if len(hours) > 1 and now.hour > max(hours):
+        return None
+    started = [h for h in hours if h <= now.hour]
+    return f"{now.date().isoformat()}T{max(started):02}" if started else None
+
+
 def summary_due(config: Config, now: datetime) -> bool:
-    """Is it past SUMMARY_HOUR and no summary was sent today yet?"""
+    """Has a scheduled hour started for which no summary went out yet?"""
+    slot = current_slot(config, now)
     last = _last_summary_file(config)
-    sent_today = last.exists() and last.read_text().strip() == now.date().isoformat()
-    return now.hour >= config.summary_hour and not sent_today
+    return slot is not None and not (last.exists() and last.read_text().strip() == slot)
 
 
 def maybe_send_summary(config: Config | None = None, now: datetime | None = None, post=None,
                        show=print) -> int:
-    """Send the morning summary once a day. Called every few minutes while running."""
+    """Send a summary once per scheduled hour (if anything is waiting).
+
+    Called every minute while email-watch or email-agent runs. An hour with
+    nothing waiting sends nothing.
+    """
     config = config or load_config()
     now = now or datetime.now()
     if not config.ntfy_topic or not summary_due(config, now):
         return 0
     count = send_summary(config, now.date(), post=post, show=show)
     _last_summary_file(config).parent.mkdir(parents=True, exist_ok=True)
-    _last_summary_file(config).write_text(now.date().isoformat())
+    _last_summary_file(config).write_text(current_slot(config, now))
     return count
 
 
-async def summary_loop(first=None, every_seconds: int = 600, show=print) -> None:
+async def summary_loop(first=None, every_seconds: int = 60, show=print) -> None:
     """Background task: wait for the first catch-up (`first`), then check the clock."""
     if first is not None:
         try:

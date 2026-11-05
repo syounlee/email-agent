@@ -21,6 +21,7 @@ email-ask = "email_agent.apps.ask:main"           # one question, one answer
 email-listen = "email_agent.automation.listen:main"  # watch / demo / preview listeners
 email-sync = "email_agent.mail.imap_sync:main"    # copy Gmail into the local database
 email-alerts = "email_agent.automation.alerts:main"  # phone alerts: list / test / summary
+email-autostart = "email_agent.apps.autostart:main"  # start email-watch at login (on / off / status)
 
 [build-system]
 requires = ["uv_build>=0.12.3,<0.13.0"]

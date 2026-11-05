@@ -21,7 +21,7 @@ Claude (Haiku, about $0.0003 per email) reads every new email and alerts you onl
 plus mail from the platforms you work with (💼) and cheap flights you track (✈️).
 
 - **Urgent ones go to your phone right away:** security warnings, deadlines within 3 days.
-- **The rest come in one morning summary** (8:00 by default).
+- **The rest come together in a summary**, once a morning or hourly, as you choose.
 - **Everything else is left alone.** On a real month of this inbox, about 1 email in 30
   was worth an alert.
 
@@ -80,7 +80,22 @@ uv run email-agent          # the same, plus the Alerts page at http://127.0.0.1
 ```
 
 On start, it catches up on mail that arrived while it was off. Then it reacts to new
-mail within seconds, and sends the morning summary once a day after `SUMMARY_HOUR`.
+mail within seconds. Less urgent alerts are collected and sent as one summary at the
+hours in `SUMMARY_HOURS`: `8` for once a morning, `8-22` for every hour from 8:00 to
+22:00 (an hour with nothing new sends nothing).
+
+**Start it automatically at login** (recommended), so you never have to think about it:
+
+```bash
+uv run email-autostart on       # starts now, and at every login; restarts it if it crashes
+uv run email-autostart status   # running? plus the last lines it printed
+uv run email-autostart off      # stop it, and no more auto-start
+```
+
+`on --keep-awake` also stops the Mac from idle-sleeping while it runs (closing the lid
+still sleeps). Without it, a sleeping Mac checks nothing; on wake it catches up.
+Only one program watches Gmail at a time: with auto-start on, `email-agent` just shows
+the page, and a second `email-watch` waits until the first one stops.
 
 To get alerts about mail that was already in the database before you set this up:
 
@@ -97,11 +112,12 @@ uv run email-alerts check 200    # the 200 newest emails (stars and labels the i
 
 | Command | What it does |
 |---|---|
+| `uv run email-autostart on` | Run email-watch automatically from now on (`off`, `status`) |
 | `uv run email-watch` | Watch Gmail and send alerts. No web page. |
 | `uv run email-agent` | The same, plus the Alerts page and chat at <http://127.0.0.1:3000> |
 | `uv run email-alerts` | The newest alerts in the terminal |
 | `uv run email-alerts test` | Send a test message to your phone |
-| `uv run email-alerts summary` | Send the summary now instead of waiting for the morning |
+| `uv run email-alerts summary` | Send the summary now instead of waiting for the next hour |
 | `uv run email-alerts check 200` | Check the 200 newest stored emails for alerts |
 | `uv run email-listen preview 200` | Show what *would* be alerted for the 200 newest emails, **changing and sending nothing** |
 | `uv run email-chat` | Chat in the terminal (`/help` lists commands) |

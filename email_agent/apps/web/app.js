@@ -111,7 +111,7 @@ function showStats(data) {
     el("div", { class: "muted" }, `emails in the last ${s.days} days were worth an alert`,
       s.muted ? ` · ${s.muted} sender${s.muted === 1 ? "" : "s"} muted` : ""),
     el("div", { class: "muted small-text" }, data.phone
-      ? `Urgent ones go to your phone right away; the rest in a summary at ${data.summary_hour}:00.`
+      ? `Urgent ones go to your phone right away; the rest in a summary ${data.summary_schedule}.`
       : "Phone alerts are off: set NTFY_TOPIC in .env."));
   $("#phone").textContent = data.phone ? "📱 phone on" : "📱 phone off";
   $("#phone").className = "badge " + (data.phone ? "on" : "off");

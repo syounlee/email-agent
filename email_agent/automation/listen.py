@@ -21,6 +21,7 @@ from contextlib import closing
 
 from email_agent.mail import database
 from email_agent.automation import alerts
+from email_agent.core.watch_lock import WatchLock
 from email_agent.automation.listeners import (
     ListenerRegistry, deliver_demo_email, log_path, process_pending, run_listeners,
 )
@@ -142,13 +143,22 @@ def watch_main() -> None:
     if config.mailbox != "imap":
         sys.exit("email-watch watches Gmail: set MAILBOX=imap in .env. "
                  "(To try the demo, use  MAILBOX=demo uv run email-agent)")
-    print(f"Watching {config.email_address} for important mail. "
-          f"Phone alerts: {'on' if config.ntfy_topic else 'OFF (set NTFY_TOPIC in .env)'}. "
-          f"Morning summary at {config.summary_hour}:00. Ctrl+C to stop.")
+    lock = WatchLock(config)
     try:
+        if not lock.acquire():
+            # e.g. the auto-started watcher, or the web page, is already watching
+            print(f"Another program is already watching Gmail (process {lock.holder()}). "
+                  "Waiting until it stops, so mail isn't checked twice... (Ctrl+C to quit)",
+                  flush=True)
+            lock.acquire(wait=True)
+        print(f"Watching {config.email_address} for important mail. "
+              f"Phone alerts: {'on' if config.ntfy_topic else 'OFF (set NTFY_TOPIC in .env)'}. "
+              f"Summaries {config.summary_schedule}. Ctrl+C to stop.", flush=True)
         asyncio.run(watch_gmail())
     except KeyboardInterrupt:
         print("\nStopped.")
+    finally:
+        lock.release()
 
 
 def main() -> None:

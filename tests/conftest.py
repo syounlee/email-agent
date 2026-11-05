@@ -20,6 +20,7 @@ def separate_database(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("MAILBOX", "demo")  # tests never touch your real Gmail
     monkeypatch.setenv("NTFY_TOPIC", "")    # ...and never buzz your phone
+    monkeypatch.setenv("SUMMARY_HOURS", "8")  # same schedule for every test, whatever .env says
 
 
 def pytest_collection_modifyitems(config, items):

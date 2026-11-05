@@ -24,7 +24,7 @@ DEFAULT_SYNC_MAX_EMAILS = 30
 DEFAULT_SYNC_DAYS = 7
 DEFAULT_PORT = 3000
 DEFAULT_NTFY_SERVER = "https://ntfy.sh"
-DEFAULT_SUMMARY_HOUR = 8  # the morning summary goes out at 8:00 (or at start, if later)
+DEFAULT_SUMMARY_HOURS = "8"  # when summaries go out: "8", "8-22" (hourly) or "8,13,18"
 
 
 @dataclass(frozen=True)
@@ -48,11 +48,41 @@ class Config:
     # it can read your alerts, so it is never shown. Empty = no phone alerts.
     ntfy_topic: str = field(default="", repr=False)
     ntfy_server: str = DEFAULT_NTFY_SERVER
-    summary_hour: int = DEFAULT_SUMMARY_HOUR
+    summary_hours: tuple = (8,)  # the hours (0-23) a summary of waiting alerts goes out
+
+    @property
+    def summary_schedule(self) -> str:
+        """In words, e.g. 'every hour from 8:00 to 22:00'."""
+        return describe_hours(self.summary_hours)
 
     @property
     def has_api_key(self) -> bool:
         return bool(self.anthropic_api_key)
+
+
+def parse_hours(text: str) -> tuple:
+    """'8' -> (8,);  '8-22' -> (8, 9, ..., 22);  '8,13,18' -> (8, 13, 18)."""
+    hours = set()
+    for part in str(text).replace(" ", "").split(","):
+        if not part:
+            continue
+        first, _, last = part.partition("-")
+        start, end = int(first), int(last or first)
+        if not (0 <= start <= end <= 23):
+            raise ValueError(f"SUMMARY_HOURS: {part!r} is not an hour or range within 0-23")
+        hours.update(range(start, end + 1))
+    if not hours:
+        raise ValueError("SUMMARY_HOURS is empty; use e.g. 8 or 8-22")
+    return tuple(sorted(hours))
+
+
+def describe_hours(hours) -> str:
+    hours = tuple(hours)
+    if len(hours) == 1:
+        return f"at {hours[0]}:00"
+    if hours == tuple(range(hours[0], hours[-1] + 1)):
+        return f"every hour from {hours[0]}:00 to {hours[-1]}:00"
+    return "at " + ", ".join(f"{h}:00" for h in hours)
 
 
 def load_config(env_file: Path | None = None) -> Config:
@@ -92,5 +122,6 @@ def load_config(env_file: Path | None = None) -> Config:
         port=int(getenv("PORT") or DEFAULT_PORT),
         ntfy_topic=(getenv("NTFY_TOPIC") or "").strip(),
         ntfy_server=(getenv("NTFY_SERVER") or DEFAULT_NTFY_SERVER).rstrip("/"),
-        summary_hour=int(getenv("SUMMARY_HOUR") or DEFAULT_SUMMARY_HOUR),
+        summary_hours=parse_hours(getenv("SUMMARY_HOURS") or getenv("SUMMARY_HOUR")
+                                  or DEFAULT_SUMMARY_HOURS),
     )
