@@ -1,4 +1,11 @@
-from email_agent.mailbox import load_emails, read_email, search_emails
+import json
+
+from email_agent.database import SAMPLE_EMAILS
+from email_agent.mailbox import read_email, search_emails
+
+
+def load_emails():
+    return json.loads(SAMPLE_EMAILS.read_text())
 
 
 def test_sample_data_has_15_emails_with_all_fields():
@@ -51,3 +58,9 @@ def test_read_email_returns_body():
 def test_read_email_many_ids_keeps_order_and_skips_unknown():
     emails = read_email(["e006", "nope", "e001"])
     assert [e["id"] for e in emails] == ["e006", "e001"]
+
+
+def test_read_email_gives_booleans_not_numbers():
+    [email] = read_email("e001")
+    assert email["read"] is False and email["starred"] is True
+    assert email["labels"] == ["inbox", "work", "important"]

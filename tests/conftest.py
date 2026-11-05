@@ -14,6 +14,12 @@ def pytest_addoption(parser):
     )
 
 
+@pytest.fixture(autouse=True)
+def separate_database(tmp_path, monkeypatch):
+    """Every test gets its own fresh email database, never your real one."""
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+
+
 def pytest_collection_modifyitems(config, items):
     if config.getoption("--live"):
         return

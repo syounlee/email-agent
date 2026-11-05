@@ -25,16 +25,19 @@ def _as_text(data) -> dict:
 @tool(
     "search_emails",
     "Search the mailbox. ALWAYS use this first to find emails relevant to the "
-    "question. Matches emails that contain every word of the query in the "
-    "subject, sender or body (case-insensitive), newest first. Returns only "
-    "short previews (id, from, subject, date, snippet), not full text. Use one "
-    "or two distinctive keywords (e.g. 'invoice', 'overdue', a sender name); "
-    "if nothing comes back, try a different or shorter query. Then call "
-    "read_email on the promising ids before answering.",
+    "question. Gmail-style syntax; all parts must match: plain words (matched "
+    'in subject, sender or body; "invoices" also matches "invoice"), '
+    '"exact phrase", from:name (part of the sender address), subject:word, '
+    "is:unread, is:read, is:starred, newer_than:7d (d/w/m/y). "
+    "Example: 'invoice from:billing is:unread'. Results are newest first and "
+    "are only short previews (id, from, subject, date, snippet), not full "
+    "text. Start with one or two distinctive keywords; if nothing comes back, "
+    "try different or fewer words. Then call read_email on the promising ids "
+    "before answering.",
     {
         "type": "object",
         "properties": {
-            "query": {"type": "string", "description": "Keywords to look for."},
+            "query": {"type": "string", "description": "Gmail-style search, e.g. 'invoice is:unread'."},
             "limit": {"type": "integer", "description": "Max results (default 10).", "default": 10},
         },
         "required": ["query"],
@@ -42,7 +45,10 @@ def _as_text(data) -> dict:
     annotations={"readOnlyHint": True},
 )
 async def search_emails_tool(args: dict) -> dict:
-    results = mailbox.search_emails(args["query"], limit=args.get("limit", 10))
+    try:
+        results = mailbox.search_emails(args["query"], limit=args.get("limit", 10))
+    except ValueError as problem:  # e.g. is:important, which we don't support
+        return _as_text({"error": str(problem)})
     if not results:
         return _as_text({"results": [], "note": "No emails matched. Try other keywords."})
     return _as_text({"results": results})

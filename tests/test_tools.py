@@ -62,3 +62,13 @@ def test_system_prompt_rules():
     assert "only answer from emails you have read" in p
     assert "sender and date" in p
     assert "found nothing" in p
+
+
+async def test_search_tool_reports_bad_query_to_claude():
+    data = _payload(await search_emails_tool.handler({"query": "is:important"}))
+    assert "Unsupported is:important" in data["error"]
+
+
+async def test_search_tool_understands_gmail_syntax():
+    data = _payload(await search_emails_tool.handler({"query": "invoice is:unread"}))
+    assert [r["id"] for r in data["results"]] == ["e002"]
