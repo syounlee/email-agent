@@ -174,6 +174,9 @@ def sync(config: Config | None = None, conn=None, connect=_connect, today: date 
             newest = sorted(uids)[-config.sync_max_emails:] if config.sync_max_emails else []
 
             already = database.stored_uids(conn, config.imap_folder, uidvalidity)
+            # The very first sync fills an empty database: don't treat those
+            # (possibly 30) old emails as "new mail" for the listeners.
+            first_sync = database.count(conn) == 0
             to_fetch = [u for u in newest if u not in already]
 
             emails = []
@@ -192,12 +195,13 @@ def sync(config: Config | None = None, conn=None, connect=_connect, today: date 
                         flags=data.get(b"FLAGS", ()), internal_date=data.get(b"INTERNALDATE"),
                         gmail_labels=data.get(b"X-GM-LABELS"),
                     ))
-            added = database.add_emails(conn, emails)
+            new_ids = database.add_emails(conn, emails, pending=not first_sync)
     finally:
         if own_conn:
             conn.close()
 
-    return {"found": len(newest), "already_stored": len(newest) - len(to_fetch), "added": added}
+    return {"found": len(newest), "already_stored": len(newest) - len(to_fetch),
+            "added": len(new_ids), "new_ids": new_ids}
 
 
 def main() -> None:

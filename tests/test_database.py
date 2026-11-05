@@ -39,6 +39,28 @@ def test_reopening_does_not_reload(tmp_path):
         assert count(again) == 15
 
 
+def test_old_databases_get_the_new_column(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.execute("CREATE TABLE emails (num INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE, "
+                "sender TEXT NOT NULL, recipient TEXT NOT NULL, subject TEXT NOT NULL, "
+                "date TEXT NOT NULL, body TEXT NOT NULL, labels TEXT NOT NULL DEFAULT '[]', "
+                "read INTEGER NOT NULL DEFAULT 0, starred INTEGER NOT NULL DEFAULT 0, "
+                "folder TEXT, uid INTEGER, uidvalidity INTEGER)")
+    old.execute("INSERT INTO emails (id, sender, recipient, subject, date, body) "
+                "VALUES ('x1', 'a', 'b', 's', '2026-11-01', 'hi')")
+    old.commit()
+    old.close()
+    with closing(open_db(path, load_sample=False)) as c:
+        assert database.pending_for_listeners(c) == []  # old emails aren't "new"
+        assert database.add_emails(c, [{**read(c, ["x1"])[0], "id": "x2"}], pending=True) == ["x2"]
+        assert [e["id"] for e in database.pending_for_listeners(c)] == ["x2"]
+        database.mark_listened(c, "x2")
+        assert database.pending_for_listeners(c) == []
+
+
 def test_database_file_lives_in_data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "somewhere"))
     assert database.default_db_path() == tmp_path / "somewhere" / "emails-demo.db"

@@ -71,4 +71,7 @@ async def test_chat_star_declined_changes_nothing():
     asked, tools, result, email = await _star_the_urgent_email("n")
     assert len(asked) >= 1
     assert email["starred"] is False
-    assert "not" in result.result.lower()  # tells the user it wasn't done
+    # Tells the user it wasn't done. Claude words this differently each time
+    # ("not", "didn't", "declined"...), so accept any of the usual phrasings.
+    text = result.result.lower().replace("’", "'")
+    assert any(word in text for word in ("not", "n't", "declin")), result.result

@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS emails (
     -- A UID only means something together with its folder and UIDVALIDITY.
     folder      TEXT,
     uid         INTEGER,
-    uidvalidity INTEGER
+    uidvalidity INTEGER,
+    -- 1 = new email that the listeners haven't looked at yet
+    pending_listeners INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS emails_by_date ON emails(date);
 CREATE INDEX IF NOT EXISTS emails_by_uid ON emails(folder, uidvalidity, uid);
@@ -88,38 +90,61 @@ def open_db(path: Path | None = None, load_sample: bool | None = None) -> sqlite
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    _add_missing_columns(conn)
     if load_sample and count(conn) == 0:
         load_json(conn, SAMPLE_EMAILS)
     return conn
 
 
-def add_emails(conn: sqlite3.Connection, emails: list[dict]) -> int:
+def _add_missing_columns(conn: sqlite3.Connection) -> None:
+    """Upgrade databases made by earlier steps (they lack newer columns)."""
+    have = {row[1] for row in conn.execute("PRAGMA table_info(emails)")}
+    if "pending_listeners" not in have:
+        conn.execute("ALTER TABLE emails ADD COLUMN pending_listeners INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+
+
+def add_emails(conn: sqlite3.Connection, emails: list[dict], pending: bool = False) -> list[str]:
     """Store emails (dicts like the JSON file); skip ids already stored.
 
-    Returns how many were added.
+    pending=True marks the new ones for the listeners to look at.
+    Returns the ids that were actually added.
     """
-    before = count(conn)
-    conn.executemany(
-        """INSERT OR IGNORE INTO emails
-           (id, sender, recipient, subject, date, body, labels, read, starred,
-            folder, uid, uidvalidity)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        [
+    added = []
+    for e in emails:
+        cursor = conn.execute(
+            """INSERT OR IGNORE INTO emails
+               (id, sender, recipient, subject, date, body, labels, read, starred,
+                folder, uid, uidvalidity, pending_listeners)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (e["id"], e["from"], e["to"], e["subject"], e["date"], e["body"],
              json.dumps(e.get("labels", [])), int(e.get("read", False)),
              int(e.get("starred", False)),
-             e.get("folder"), e.get("uid"), e.get("uidvalidity"))
-            for e in emails
-        ],
-    )
+             e.get("folder"), e.get("uid"), e.get("uidvalidity"), int(pending)),
+        )
+        if cursor.rowcount:
+            added.append(e["id"])
     conn.commit()
-    return count(conn) - before
+    return added
 
 
 def load_json(conn: sqlite3.Connection, path: Path) -> int:
     """Add emails from a JSON file; skip ids already stored. Returns how many were added."""
     with open(path, encoding="utf-8") as f:
-        return add_emails(conn, json.load(f))
+        return len(add_emails(conn, json.load(f)))
+
+
+def pending_for_listeners(conn: sqlite3.Connection) -> list[dict]:
+    """New emails the listeners haven't seen yet, oldest first."""
+    rows = conn.execute(
+        "SELECT * FROM emails WHERE pending_listeners = 1 ORDER BY date"
+    ).fetchall()
+    return [_row_to_email(r) for r in rows]
+
+
+def mark_listened(conn: sqlite3.Connection, email_id: str) -> None:
+    conn.execute("UPDATE emails SET pending_listeners = 0 WHERE id = ?", (email_id,))
+    conn.commit()
 
 
 def stored_uids(conn: sqlite3.Connection, folder: str, uidvalidity: int) -> set[int]:

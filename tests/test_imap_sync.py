@@ -210,7 +210,9 @@ def test_sync_is_read_only_and_takes_newest(imap_config, imap_db):
     [fetch] = [c for c in server.calls if c[0] == "fetch"]
     assert fetch[1] == [103, 104, 105]  # the 3 NEWEST, not the oldest
     assert "BODY.PEEK[]" in fetch[2]  # PEEK = don't mark as read
-    assert result == {"found": 3, "already_stored": 0, "added": 3}
+    assert result == {"found": 3, "already_stored": 0, "added": 3,
+                      "new_ids": ["<msg-3@example.com>", "<msg-4@example.com>",
+                                  "<msg-5@example.com>"]}
 
 
 def test_sync_stores_uid_folder_and_gmail_labels(imap_config, imap_db):
@@ -232,8 +234,16 @@ def test_sync_skips_emails_already_stored(imap_config, imap_db):
 
     [fetch] = [c for c in server.calls if c[0] == "fetch"]
     assert fetch[1] == [104]  # only downloads the new one
-    assert result == {"found": 3, "already_stored": 2, "added": 1}
+    assert result == {"found": 3, "already_stored": 2, "added": 1,
+                      "new_ids": ["<msg-4@example.com>"]}
     assert database.count(imap_db) == 4
+
+
+def test_only_mail_after_the_first_sync_waits_for_listeners(imap_config, imap_db):
+    sync(imap_config, imap_db, connect=lambda cfg: FakeServer(_numbered(3)))
+    assert database.pending_for_listeners(imap_db) == []  # old mail: not "new"
+    sync(imap_config, imap_db, connect=lambda cfg: FakeServer(_numbered(4)))
+    assert [e["id"] for e in database.pending_for_listeners(imap_db)] == ["<msg-4@example.com>"]
 
 
 def test_sync_with_nothing_new_fetches_nothing(imap_config, imap_db):

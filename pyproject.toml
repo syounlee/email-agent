@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "A step-by-step email agent built with the Claude Agent SDK"
 requires-python = ">=3.12"
 dependencies = [
+    "anthropic>=2.5.0",
     "claude-agent-sdk>=0.2.178",
     "imapclient>=4.1.0",
     "python-dotenv>=1.2.4",
