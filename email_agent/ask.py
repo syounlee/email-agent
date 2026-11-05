@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from claude_agent_sdk import AssistantMessage, ResultMessage, ToolUseBlock, query
 
 from email_agent.agent import build_options
+from email_agent.mailbox import prepare
 
 
 @dataclass
@@ -41,6 +42,7 @@ def main() -> None:
     if len(sys.argv) < 2:
         print('Usage: uv run python -m email_agent.ask "your question"')
         sys.exit(1)
+    prepare()
     answer = asyncio.run(ask(" ".join(sys.argv[1:])))
     for name, args in answer.tool_calls:
         print(f"  [tool] {name.split('__')[-1]} {args}")

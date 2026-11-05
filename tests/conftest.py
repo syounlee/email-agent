@@ -16,8 +16,9 @@ def pytest_addoption(parser):
 
 @pytest.fixture(autouse=True)
 def separate_database(tmp_path, monkeypatch):
-    """Every test gets its own fresh email database, never your real one."""
+    """Every test gets its own fresh demo database, never your real one."""
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("MAILBOX", "demo")  # tests never touch your real Gmail
 
 
 def pytest_collection_modifyitems(config, items):

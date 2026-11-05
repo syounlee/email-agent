@@ -41,7 +41,14 @@ def test_reopening_does_not_reload(tmp_path):
 
 def test_database_file_lives_in_data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path / "somewhere"))
-    assert database.default_db_path() == tmp_path / "somewhere" / "emails.db"
+    assert database.default_db_path() == tmp_path / "somewhere" / "emails-demo.db"
+    monkeypatch.setenv("MAILBOX", "imap")
+    assert database.default_db_path() == tmp_path / "somewhere" / "emails-imap.db"
+
+
+def test_new_imap_database_starts_empty(tmp_path):
+    with closing(open_db(tmp_path / "emails-imap.db", load_sample=False)) as c:
+        assert count(c) == 0
 
 
 def test_read_returns_booleans_and_lists(conn):

@@ -1,6 +1,7 @@
 """Offline tests: call the tool functions directly, no Claude involved."""
 
 import json
+from datetime import datetime
 
 from email_agent.agent import SYSTEM_PROMPT, build_options
 from email_agent.config import load_config
@@ -54,7 +55,8 @@ def test_options_use_caps_from_config():
     assert opts.model == cfg.model
     assert opts.max_budget_usd == cfg.max_budget_usd
     assert opts.max_turns == cfg.max_turns
-    assert opts.system_prompt == SYSTEM_PROMPT
+    assert opts.system_prompt.startswith(SYSTEM_PROMPT)
+    assert f"{datetime.now():%Y-%m-%d}" in opts.system_prompt.split("Today is")[1]
 
 
 def test_system_prompt_rules():

@@ -1,9 +1,10 @@
 """Store emails in SQLite, with a full-text index for fast word search.
 
-- open_db(): open (or create) DATA_DIR/emails.db. On first run it loads
-  sample_data/emails.json.
-- load_json(): add emails from a JSON file. Emails whose id is already in the
-  database are skipped, so loading twice never makes duplicates.
+- open_db(): open (or create) the database for the current MAILBOX:
+  DATA_DIR/emails-demo.db or DATA_DIR/emails-imap.db. The demo one loads
+  sample_data/emails.json on first run.
+- add_emails() / load_json(): store emails. Emails whose id is already in
+  the database are skipped, so loading twice never makes duplicates.
 - search(): Gmail-style search, newest first.
 - read(): full emails by id.
 """
@@ -18,7 +19,6 @@ from pathlib import Path
 from email_agent.config import PROJECT_ROOT, load_config
 
 SAMPLE_EMAILS = PROJECT_ROOT / "sample_data" / "emails.json"
-DB_FILENAME = "emails.db"
 SNIPPET_LENGTH = 120
 
 SCHEMA = """
@@ -32,9 +32,15 @@ CREATE TABLE IF NOT EXISTS emails (
     body      TEXT NOT NULL,
     labels    TEXT NOT NULL DEFAULT '[]',  -- JSON list
     read      INTEGER NOT NULL DEFAULT 0,
-    starred   INTEGER NOT NULL DEFAULT 0
+    starred   INTEGER NOT NULL DEFAULT 0,
+    -- Where the email lives on the IMAP server (empty for demo emails).
+    -- A UID only means something together with its folder and UIDVALIDITY.
+    folder      TEXT,
+    uid         INTEGER,
+    uidvalidity INTEGER
 );
 CREATE INDEX IF NOT EXISTS emails_by_date ON emails(date);
+CREATE INDEX IF NOT EXISTS emails_by_uid ON emails(folder, uidvalidity, uid);
 
 -- Full-text index over subject, sender and body. 'porter' makes
 -- 'invoices' match 'invoice'. It reads its text from the emails table.
@@ -63,40 +69,66 @@ END;
 
 # ---------- opening and loading ----------
 
-def default_db_path() -> Path:
-    return load_config().data_dir / DB_FILENAME
+def default_db_path(mailbox: str | None = None) -> Path:
+    """DATA_DIR/emails-demo.db or DATA_DIR/emails-imap.db, so they never mix."""
+    config = load_config()
+    return config.data_dir / f"emails-{mailbox or config.mailbox}.db"
 
 
-def open_db(path: Path | None = None) -> sqlite3.Connection:
-    """Open the database, creating it (and loading the sample emails) if new."""
+def open_db(path: Path | None = None, load_sample: bool | None = None) -> sqlite3.Connection:
+    """Open the database, creating it if new.
+
+    A new demo database gets the sample emails. A new imap database starts
+    empty until you sync.
+    """
+    if load_sample is None:
+        load_sample = load_config().mailbox == "demo"
     path = Path(path or default_db_path())
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
-    if count(conn) == 0:
+    if load_sample and count(conn) == 0:
         load_json(conn, SAMPLE_EMAILS)
     return conn
 
 
-def load_json(conn: sqlite3.Connection, path: Path) -> int:
-    """Add emails from a JSON file; skip ids already stored. Returns how many were added."""
-    with open(path, encoding="utf-8") as f:
-        emails = json.load(f)
+def add_emails(conn: sqlite3.Connection, emails: list[dict]) -> int:
+    """Store emails (dicts like the JSON file); skip ids already stored.
+
+    Returns how many were added.
+    """
     before = count(conn)
     conn.executemany(
         """INSERT OR IGNORE INTO emails
-           (id, sender, recipient, subject, date, body, labels, read, starred)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           (id, sender, recipient, subject, date, body, labels, read, starred,
+            folder, uid, uidvalidity)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             (e["id"], e["from"], e["to"], e["subject"], e["date"], e["body"],
              json.dumps(e.get("labels", [])), int(e.get("read", False)),
-             int(e.get("starred", False)))
+             int(e.get("starred", False)),
+             e.get("folder"), e.get("uid"), e.get("uidvalidity"))
             for e in emails
         ],
     )
     conn.commit()
     return count(conn) - before
+
+
+def load_json(conn: sqlite3.Connection, path: Path) -> int:
+    """Add emails from a JSON file; skip ids already stored. Returns how many were added."""
+    with open(path, encoding="utf-8") as f:
+        return add_emails(conn, json.load(f))
+
+
+def stored_uids(conn: sqlite3.Connection, folder: str, uidvalidity: int) -> set[int]:
+    """IMAP UIDs already in the database for this folder."""
+    rows = conn.execute(
+        "SELECT uid FROM emails WHERE folder = ? AND uidvalidity = ? AND uid IS NOT NULL",
+        (folder, uidvalidity),
+    )
+    return {r[0] for r in rows}
 
 
 def count(conn: sqlite3.Connection) -> int:
@@ -115,6 +147,8 @@ def _row_to_email(row: sqlite3.Row) -> dict:
         "labels": json.loads(row["labels"]),
         "read": bool(row["read"]),
         "starred": bool(row["starred"]),
+        "folder": row["folder"],
+        "uid": row["uid"],
     }
 
 

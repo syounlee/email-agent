@@ -12,6 +12,7 @@ from claude_agent_sdk import AssistantMessage, ClaudeSDKClient, ResultMessage, T
 
 from email_agent.agent import build_options
 from email_agent.config import load_config
+from email_agent.mailbox import prepare
 
 EXIT_WORDS = {"exit", "quit", "bye"}
 
@@ -77,6 +78,7 @@ async def main() -> None:
     config = load_config()
     print(f"Email agent chat ({config.model}, budget ${config.max_budget_usd:.2f}). "
           'Type "exit" or press Ctrl+C to stop.')
+    prepare(config)
     async with ClaudeSDKClient(options=build_options(config)) as client:
         await chat_loop(client, budget_usd=config.max_budget_usd)
 
