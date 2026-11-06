@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 840" width="1440" height="840"
+     font-family="-apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10" fill="none" stroke="#333" stroke-width="1.6"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10" fill="none" stroke="#2f86eb" stroke-width="1.6"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10" fill="none" stroke="#1e9e5a" stroke-width="1.6"/>
+    </marker>
+    <style>
+      .h { font-size: 22px; font-weight: 600; }
+      .t { font-size: 17px; fill: #333; }
+      .s { font-size: 15px; fill: #555; }
+      .lab { font-size: 18px; fill: #222; }
+      .num { font-size: 18px; font-weight: 700; fill: #fff; }
+      .tool { font-size: 18px; fill: #222; font-family: Menlo, monospace; }
+    </style>
+  </defs>
+
+  <!-- whole agent -->
+  <rect x="18" y="18" width="1404" height="804" rx="26" fill="#f7f8fa" stroke="#333" stroke-width="2" stroke-dasharray="10 7"/>
+  <text x="50" y="62" font-size="26" font-weight="700">email agent</text>
+  <text x="50" y="88" class="s">runs on every new email in the dump Gmail (email-watch, started at login)</text>
+
+  <!-- trigger -->
+  <rect x="510" y="112" width="280" height="84" rx="16" fill="#fff" stroke="#888" stroke-width="2"/>
+  <text x="650" y="148" text-anchor="middle" class="h">📨 new email</text>
+  <text x="650" y="176" text-anchor="middle" class="s">Gmail pushes it at once (IDLE)</text>
+
+  <!-- email -> model, with the skip check -->
+  <line x1="650" y1="196" x2="650" y2="292" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="636" y="222" text-anchor="end" class="s">skip (no Claude call) if:</text>
+  <text x="636" y="242" text-anchor="end" class="s">login code you asked for,</text>
+  <text x="636" y="262" text-anchor="end" class="s">sender you muted, already alerted</text>
+
+  <!-- instructions -->
+  <rect x="62" y="278" width="330" height="168" rx="22" fill="#fff" stroke="#f2c230" stroke-width="3"/>
+  <text x="227" y="314" text-anchor="middle" class="h" fill="#b8520e">instructions</text>
+  <text x="227" y="344" text-anchor="middle" class="t">alert only for: action · coupon</text>
+  <text x="227" y="368" text-anchor="middle" class="t">money · security</text>
+  <text x="227" y="394" text-anchor="middle" class="s">not ads, news or your own receipts</text>
+  <text x="227" y="420" text-anchor="middle" class="s">+ your "Not important" examples</text>
+  <line x1="392" y1="350" x2="508" y2="350" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- model -->
+  <rect x="512" y="296" width="276" height="108" rx="20" fill="#3a8ff0"/>
+  <text x="650" y="344" text-anchor="middle" font-size="30" font-weight="600" fill="#fff">✦ Claude</text>
+  <text x="650" y="376" text-anchor="middle" font-size="16" fill="#e6f0ff">Haiku · reads one email</text>
+  <circle cx="512" cy="296" r="19" fill="#111"/><text x="512" y="302" text-anchor="middle" class="num">1</text>
+  <text x="664" y="270" class="lab">reason • important?</text>
+
+  <!-- model -> answer -->
+  <line x1="650" y1="404" x2="650" y2="498" stroke="#2f86eb" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrowBlue)"/>
+  <circle cx="650" cy="450" r="19" fill="#111"/><text x="650" y="456" text-anchor="middle" class="num">2</text>
+  <text x="680" y="456" class="lab" fill="#2f86eb">answer</text>
+
+  <!-- answer -->
+  <rect x="486" y="502" width="328" height="118" rx="18" fill="#e3f0fd" stroke="#2f86eb" stroke-width="2"/>
+  <text x="650" y="536" text-anchor="middle" class="h" fill="#1d5fae">✦ fixed-form answer</text>
+  <text x="650" y="566" text-anchor="middle" class="t">kind · title · detail</text>
+  <text x="650" y="592" text-anchor="middle" class="t">deadline · urgent</text>
+  <text x="650" y="652" text-anchor="middle" class="s">kind = none → stop, nothing sent</text>
+
+  <!-- answer -> toolbox -->
+  <path d="M814 540 C 870 540, 870 330, 926 330" fill="none" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
+  <circle cx="868" cy="440" r="19" fill="#111"/><text x="868" y="446" text-anchor="middle" class="num">3</text>
+  <text x="826" y="490" class="lab">act</text>
+
+  <!-- toolbox -->
+  <rect x="930" y="112" width="460" height="356" rx="22" fill="none" stroke="#1e9e5a" stroke-width="2.5" stroke-dasharray="9 7"/>
+  <text x="958" y="150" class="h">toolbox</text>
+  <text x="1052" y="150" class="s">(plain code, runs Claude's decision)</text>
+  <rect x="980" y="176" width="360" height="62" rx="16" fill="#fff" stroke="#333" stroke-width="2"/>
+  <text x="1160" y="213" text-anchor="middle" class="tool">star_email</text>
+  <rect x="980" y="256" width="360" height="62" rx="16" fill="#fff" stroke="#333" stroke-width="2"/>
+  <text x="1160" y="293" text-anchor="middle" class="tool">add_label("Alerts")</text>
+  <rect x="980" y="336" width="360" height="62" rx="16" fill="#fff" stroke="#333" stroke-width="2"/>
+  <text x="1160" y="373" text-anchor="middle" class="tool">alert → saved to alerts list</text>
+  <text x="1160" y="440" text-anchor="middle" class="s">security codes are masked before sending</text>
+
+  <!-- alert -> delivery -->
+  <line x1="1160" y1="468" x2="1160" y2="526" stroke="#1e9e5a" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <circle cx="1160" cy="497" r="19" fill="#111"/><text x="1160" y="503" text-anchor="middle" class="num">4</text>
+  <text x="1192" y="503" class="lab" fill="#1e9e5a">notify via ntfy</text>
+
+  <!-- delivery -->
+  <rect x="930" y="530" width="220" height="150" rx="18" fill="#fff" stroke="#e5484d" stroke-width="2.5"/>
+  <text x="1040" y="570" text-anchor="middle" class="h">📱 phone now</text>
+  <text x="1040" y="600" text-anchor="middle" class="s">urgent: security,</text>
+  <text x="1040" y="622" text-anchor="middle" class="s">or a deadline</text>
+  <text x="1040" y="644" text-anchor="middle" class="s">within 3 days</text>
+  <rect x="1170" y="530" width="220" height="150" rx="18" fill="#fff" stroke="#8a63d2" stroke-width="2.5"/>
+  <text x="1280" y="570" text-anchor="middle" class="h">📬 summary</text>
+  <text x="1280" y="600" text-anchor="middle" class="s">everything else, at the</text>
+  <text x="1280" y="622" text-anchor="middle" class="s">next hour 8:00–22:00,</text>
+  <text x="1280" y="644" text-anchor="middle" class="s">only if something waits</text>
+
+  <!-- you review on the Alerts page -->
+  <path d="M1160 680 L1160 740 L394 740" fill="none" stroke="#333" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+  <text x="780" y="728" text-anchor="middle" class="lab">you read it, then mark it</text>
+
+  <rect x="62" y="560" width="330" height="200" rx="22" fill="#fff" stroke="#888" stroke-width="2"/>
+  <text x="227" y="598" text-anchor="middle" class="h">Alerts page</text>
+  <text x="227" y="630" text-anchor="middle" class="s">uv run email-agent</text>
+  <text x="227" y="666" text-anchor="middle" class="t">✅ Done</text>
+  <text x="227" y="694" text-anchor="middle" class="t">🙈 Not important</text>
+  <text x="227" y="722" text-anchor="middle" class="t">🔇 Mute sender</text>
+
+  <!-- learn: back into the instructions -->
+  <line x1="227" y1="558" x2="227" y2="450" stroke="#b8520e" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+  <circle cx="227" cy="504" r="19" fill="#111"/><text x="227" y="510" text-anchor="middle" class="num">5</text>
+  <text x="258" y="510" class="lab" fill="#b8520e">learn</text>
+</svg>

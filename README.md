@@ -5,6 +5,24 @@ and websites) and tells your phone only when something there matters. It runs on
 own computer: Claude Haiku (through the Anthropic API) sorts the mail, and the chat is
 built with the [Claude Agent SDK](https://pypi.org/project/claude-agent-sdk/) for Python.
 
+![How the agent handles each new email: Claude reads it with your instructions, answers in a fixed form, the code stars and labels it and alerts your phone now or in the hourly summary, and what you mark on the Alerts page teaches it](docs/agent-diagram.png)
+
+**How it works, for each new email:**
+
+1. **Reason:** Claude Haiku reads it, along with the instructions (which kinds matter, and
+   your past "Not important" examples). Login codes you asked for and muted senders are
+   skipped without asking Claude.
+2. **Answer:** Claude fills in a fixed form: kind, title, detail, deadline, urgent.
+   Kind "none" means not important, and nothing happens.
+3. **Act:** plain code carries out the answer: it stars the email, labels it "Alerts" and
+   saves the alert.
+4. **Notify:** urgent alerts go to your phone at once (via ntfy). The rest wait for the
+   summary.
+5. **Learn:** what you mark on the Alerts page (Done, Not important, Mute) shapes the next
+   decisions.
+
+The diagram's source is [docs/agent-diagram.svg](docs/agent-diagram.svg).
+
 ![The Alerts page: alerts on the left, the email behind one in the middle, chat on the right](docs/screenshot.png)
 
 ## What it does
