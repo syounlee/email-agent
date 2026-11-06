@@ -8,10 +8,14 @@ Alerts about emails that need you are important_mail.py's job.
 It only labels: nothing is archived or marked read.
 
 Edit the lists below to teach it new senders; saving the file is enough.
+They are common examples: replace them with the senders in your own inbox.
+Work senders come from WORK_SENDERS in .env (see work_alerts.py).
 """
 
 import re
 from datetime import date
+
+from email_agent.core.config import load_config
 
 config = {
     "id": "triage",
@@ -28,19 +32,15 @@ LABELS = {
 
 # ---- free rules: sender domains (the address ends with one of these) ----
 NEWS_SENDERS = (
-    "theathletic.com", "news6.example.com", "news3.example.com", "substack.com", "nytimes.com",
-    "infoq.com", "news4.example.com", "redditmail.com", "medium.com", "theguardian.com",
-    "news.example.com", "news2.example.com", "flightaware.com", "news5.example.com",
-    "nvidia.com", "claude.com", "ollama.com",
+    "nytimes.com", "substack.com", "medium.com", "theguardian.com", "redditmail.com",
+    "claude.com",
 )
 SHOP_SENDERS = (
-    "hoka.com", "rei.com", "backcountry.com", "ralphlauren.com", "patagonia.com",
-    "oakywood.shop", "underarmour.com", "decathlon.com", "uniqlo.com", "artlist.io",
-    "samsung.com", "trip.com", "skyscanner.com", "netflix.com",
+    "uniqlo.com", "nike.com", "ikea.com", "zara.com", "netflix.com", "trip.com",
+    "skyscanner.com",
 )
-PAYMENT_SENDERS = ("kcp.co.kr", "easypay.co.kr", "bank.example.com", "paypal.com")
-SOCIAL_SENDERS = ("facebookmail.com", "instagram.com")
-WORK_SENDERS = ("workplatform.example.com", "workplatform2.example.com")
+PAYMENT_SENDERS = ("kcp.co.kr", "easypay.co.kr", "paypal.com")  # payment services
+SOCIAL_SENDERS = ("facebookmail.com", "instagram.com", "linkedin.com")
 
 # ---- free rules: subject patterns ----
 CODE_SUBJECT = re.compile(
@@ -86,7 +86,8 @@ def rule_type(email):
         return "finance"
     if sender == "noreply-travel@google.com":  # Google Flights price tracking
         return "travel"
-    if sender.endswith(WORK_SENDERS):
+    work_senders = load_config().work_senders
+    if work_senders and sender.endswith(work_senders):
         return "work"
     if sender.endswith(SHOP_SENDERS):
         return "promotions"

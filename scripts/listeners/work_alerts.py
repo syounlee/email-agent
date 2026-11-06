@@ -1,10 +1,14 @@
 """Work alerts: alert your phone about mail from the platforms I work with. Free (no Claude).
 
-Add or remove senders in WORK_SENDERS; saving the file is enough.
+The senders are the WORK_SENDERS setting in .env (comma-separated domains, e.g.
+WORK_SENDERS=mycompany.com,jobs.example.org). They live in .env, not here, because
+they say where you work. Edits to .env apply to the next email, no restart needed.
 Automated digests (e.g. "Your Job Digest") are skipped.
 """
 
 import re
+
+from email_agent.core.config import load_config
 
 config = {
     "id": "work-alerts",
@@ -13,13 +17,13 @@ config = {
     "event": "email_received",
 }
 
-WORK_SENDERS = ("workplatform.example.com", "workplatform2.example.com")
 SKIP_SUBJECT = re.compile(r"job digest|newsletter|webinar", re.I)
 
 
 async def handler(email, context):
     sender = email["from"].lower()
-    if not any(domain in sender for domain in WORK_SENDERS):
+    work_senders = load_config().work_senders
+    if not work_senders or not any(domain in sender for domain in work_senders):
         return {"executed": False, "reason": "not from a work platform"}
     if SKIP_SUBJECT.search(email["subject"]):
         return {"executed": False, "reason": "automated digest, skipped"}

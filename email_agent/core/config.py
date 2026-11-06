@@ -49,6 +49,9 @@ class Config:
     ntfy_topic: str = field(default="", repr=False)
     ntfy_server: str = DEFAULT_NTFY_SERVER
     summary_hours: tuple = (8,)  # the hours (0-23) a summary of waiting alerts goes out
+    # Sender domains whose mail always alerts you (work-alerts). Kept in .env,
+    # not in the code, because they say where you work.
+    work_senders: tuple = ()
 
     @property
     def summary_schedule(self) -> str:
@@ -74,6 +77,11 @@ def parse_hours(text: str) -> tuple:
     if not hours:
         raise ValueError("SUMMARY_HOURS is empty; use e.g. 8 or 8-22")
     return tuple(sorted(hours))
+
+
+def parse_list(text: str) -> tuple:
+    """'a.com, B.com' -> ('a.com', 'b.com'). Empty text -> ()."""
+    return tuple(part.strip().lower() for part in text.split(",") if part.strip())
 
 
 def describe_hours(hours) -> str:
@@ -122,6 +130,7 @@ def load_config(env_file: Path | None = None) -> Config:
         port=int(getenv("PORT") or DEFAULT_PORT),
         ntfy_topic=(getenv("NTFY_TOPIC") or "").strip(),
         ntfy_server=(getenv("NTFY_SERVER") or DEFAULT_NTFY_SERVER).rstrip("/"),
+        work_senders=parse_list(getenv("WORK_SENDERS") or ""),
         summary_hours=parse_hours(getenv("SUMMARY_HOURS") or getenv("SUMMARY_HOUR")
                                   or DEFAULT_SUMMARY_HOURS),
     )

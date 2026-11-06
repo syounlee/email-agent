@@ -44,19 +44,19 @@ class Recorder(PreviewContext):
 # ---------- triage: free rules ----------
 
 @pytest.mark.parametrize("sender,subject,expected", [
-    ("The Athletic <TheAthletic@e1.theathletic.com>", "Messi's last dance", "news"),
-    ("McKinsey <publishing@email.news6.example.com>", "AI and geopolitics", "news"),
-    ("Samsung <samsungsec@kr.email.samsung.com>", "(광고) 갤럭시 Z 폴드8", "promotions"),
-    ("Trip <trip.com@newsletter.trip.com>", "(광고) 💳VISA 삼성카드 결제시 할인!", "promotions"),  # ad wins over 결제
+    ("NYT <nytdirect@nytimes.com>", "The Morning: big game tonight", "news"),
+    ("Medium <noreply@medium.com>", "Stories for you", "news"),
+    ("Shop <news@shop.example.com>", "(광고) 신상품 안내", "promotions"),
+    ("Trip <trip.com@newsletter.trip.com>", "(광고) 💳VISA 카드 결제시 할인!", "promotions"),  # ad wins over 결제
     ("Skyscanner <no-reply@sender.skyscanner.com>", "Price drops (Advertisement)", "promotions"),
-    ("HOKA <info@emails.hoka.com>", "New arrivals", "promotions"),
+    ("Nike <info@email.nike.com>", "New arrivals", "promotions"),
     ("NHN KCP <pgadmcust@kcp.co.kr>", "결제 내역입니다.", "finance"),
     ("Bank <notice@bank.example.com>", "홍길동님 09월 거래내역입니다.", "finance"),
     ("Apple <no_reply@email.apple.com>", "Your receipt from Apple.", "finance"),
     ("Naver <naverpayadmin_noreply@navercorp.com>", "[네이버페이] 결제하신 내역을 안내해드립니다.", "finance"),
     ("Facebook <friendupdates@facebookmail.com>", "새로운 사진", "social"),
     ("Google <no-reply@accounts.google.com>", "Security alert", "security"),
-    ("OpenAI <noreply@tm.openai.com>", "New sign-in to your OpenAI account", "security"),
+    ("App <noreply@app.example.com>", "New sign-in to your account", "security"),
     ("Substack <no-reply@substack.com>", "946636 is your Substack verification code", "security"),
     ("Google <noreply-travel@google.com>", "Your tracked route: Seoul to Tokyo from ₩195k", "travel"),
     ("Staff <staff@workplatform.example.com>", "New task available", "work"),
@@ -81,7 +81,7 @@ def test_rules_leave_unclear_mail_for_claude(sender, subject):
 
 async def test_triage_rule_hit_costs_nothing():
     ctx = Recorder()
-    result = await triage.handler(mail("x@e1.theathletic.com", "Breaking news"), ctx)
+    result = await triage.handler(mail("x@nytimes.com", "Breaking news"), ctx)
     assert result["executed"] and ctx.actions == ["would add label 'News'"]
     assert ctx.prompts == []  # no Claude call
 
@@ -165,6 +165,12 @@ async def test_work_alerts_skip_digests():
     assert ctx.actions == ["would alert (phone now): Work: Evaluation Open: From staff@workplatform.example.com"]
     assert (await work.handler(mail("noreply@workplatform.example.com", "Your Job Digest"), Recorder()))["executed"] is False
     assert (await work.handler(mail("x@shop.com", "Evaluation"), Recorder()))["executed"] is False
+
+
+async def test_work_alerts_off_without_the_setting(monkeypatch):
+    monkeypatch.setenv("WORK_SENDERS", "")
+    r = await work.handler(mail("staff@workplatform.example.com", "New task"), Recorder())
+    assert r["executed"] is False
 
 
 # ---------- the folder as a whole ----------

@@ -179,8 +179,8 @@ there's no restart.
 Check a change with `uv run email-listen preview 200` before relying on it: you see
 exactly which emails would be alerted, and the cost.
 
-Other listeners in `scripts/listeners/`: **work-alerts** (mail from the domains in its
-`WORK_SENDERS` list), **flight-price-watch** (Google Flights below `MAX_PRICE_WON`), and
+Other listeners in `scripts/listeners/`: **work-alerts** (mail from the domains in
+`WORK_SENDERS` in `.env`, e.g. `WORK_SENDERS=mycompany.com`; empty = off), **flight-price-watch** (Google Flights below `MAX_PRICE_WON`), and
 four that are switched off but kept as examples: triage (labels mail by type),
 finance-labeler, login-codes and security-alerts.
 
@@ -290,3 +290,7 @@ scripts/actions/   one-click actions for the chat (/run)
 sample_data/       the demo mailbox
 tests/             offline tests next to each folder's code; live tests in tests/live/
 ```
+
+## License
+
+MIT: see [LICENSE](LICENSE).
