@@ -2,14 +2,15 @@
 
 An agent that watches an email address you'd rather ignore (the one you give to shops
 and websites) and tells your phone only when something there matters. It runs on your
-own computer, built with the
-[Claude Agent SDK](https://pypi.org/project/claude-agent-sdk/) for Python.
+own computer: Claude Haiku (through the Anthropic API) sorts the mail, and the chat is
+built with the [Claude Agent SDK](https://pypi.org/project/claude-agent-sdk/) for Python.
 
 ![The Alerts page: alerts on the left, the email behind one in the middle, chat on the right](docs/screenshot.png)
 
 ## What it does
 
-Claude (Haiku, about $0.0003 per email) reads every new email and alerts you only about:
+Claude Haiku (about $0.0003 per email) reads every new email, except login-code emails
+and senders you muted, and alerts you only about:
 
 | | |
 |---|---|
@@ -18,22 +19,30 @@ Claude (Haiku, about $0.0003 per email) reads every new email and alerts you onl
 | 💳 **Money** | refunds, cancellations, failed payments, renewals, price changes, unexpected charges |
 | 🔐 **Security** | new sign-ins, password changes, suspicious activity |
 
-plus mail from the platforms you work with (💼) and cheap flights you track (✈️).
+Two small rule-based listeners add mail from the platforms you work with (💼) and
+Google Flights prices below your target (✈️). These rules don't need Claude.
 
-- **Urgent ones go to your phone right away:** security warnings, deadlines within 3 days.
+- **Urgent ones go to your phone right away:** security warnings, deadlines within 3
+  days, anything Claude judges can't wait, and the work and flight alerts.
 - **The rest come together in a summary**, once a morning or hourly, as you choose.
-- **Everything else is left alone.** On a real month of this inbox, about 1 email in 30
-  was worth an alert.
+- **Everything else is left alone.** On 200 real emails from this account, 7 were
+  worth an alert (about 1 in 30).
+- **Each important email is starred and labeled "Alerts" in Gmail**, so you can also
+  find them there.
 
-The **Alerts page** (`uv run email-agent`, then <http://127.0.0.1:3000>) lists the alerts.
-Click one to see the email, then mark it:
+The **Alerts page** (`uv run email-agent`, then <http://127.0.0.1:3000>) lists the alerts,
+with how many emails arrived this week and how many were worth an alert. Click one to
+see the email (as a web page or plain text, with an "Open in Gmail" link), then mark it:
 
-- **✅ Done** when you've handled it.
-- **🙈 Not important**: the agent learns from these and alerts less about similar mail.
-- **🔇 Mute**: never hear from that sender again (it isn't even sent to Claude).
+- **✅ Done** when you've handled it. Handled alerts stay out of the next summary.
+- **🙈 Not important**: Claude is shown your 20 most recent "not important" alerts as
+  examples, and skips emails of the same kind from the same sender or about the same thing.
+- **🔇 Mute**: no more alerts from that sender, from any listener. Its emails aren't
+  even sent to Claude any more.
 
-The chat beside it answers questions ("What did I miss this week?", "Which coupon codes
-do I have?") and can change the rules for you ("Stop alerting me about expiring points").
+The chat beside it answers questions about your mail and alerts ("What did I miss this
+week?", "Which coupon codes do I have?"). It can also edit the alert rules for you ("Stop
+alerting me about expiring points"): it shows you the change and asks before saving.
 
 ## Setup
 
@@ -58,8 +67,10 @@ never prints it. Every setting is explained in `.env.example`.
    `SYNC_DAYS=14`, so each start catches up on everything in between.
 
 Mail is copied into a local database (`data/emails-imap.db`) **read-only**: nothing is
-marked as read. The agent only stars important emails and gives them the label
-**Alerts**. To cut off access at any time, delete the app password in your Google account.
+marked as read. On its own, the agent only stars important emails and gives them the
+label **Alerts**. Anything else (archive, mark read, other labels) happens only when you
+ask for it in the chat and approve it. To cut off access at any time, delete the app
+password in your Google account.
 
 ### 2. Phone alerts (ntfy)
 
@@ -70,7 +81,8 @@ marked as read. The agent only stars important emails and gives them the label
 3. In the app, tap **+** and subscribe to the same topic (server: ntfy.sh).
 4. `uv run email-alerts test` should make your phone buzz.
 
-What goes to ntfy: a short title and one line per email, never login codes.
+What goes to ntfy: a short title and one line per alert. Login-code emails are never
+alerted, and 6-digit codes are blanked in security alerts.
 
 ### 3. Run it
 
@@ -79,8 +91,9 @@ uv run email-watch          # just watch and alert (leave it running)
 uv run email-agent          # the same, plus the Alerts page at http://127.0.0.1:3000
 ```
 
-On start, it catches up on mail that arrived while it was off. Then it reacts to new
-mail within seconds. Less urgent alerts are collected and sent as one summary at the
+On start, it catches up on mail that arrived while it was off (up to `SYNC_MAX_EMAILS`
+from the last `SYNC_DAYS`), and again whenever the connection comes back, e.g. after
+the Mac wakes. Then it reacts to new mail within seconds. Less urgent alerts are collected and sent as one summary at the
 hours in `SUMMARY_HOURS`: `8` for once a morning, `8-22` for every hour from 8:00 to
 22:00 (an hour with nothing new sends nothing).
 
@@ -105,8 +118,13 @@ uv run email-alerts check 200    # the 200 newest emails (stars and labels the i
 
 ### Try it without Gmail
 
-`MAILBOX=demo uv run email-agent` uses 15 made-up emails. Click **overdue** or **invoice**
-(top right) to pretend mail arrived, and watch the alert appear.
+```bash
+MAILBOX=demo NTFY_TOPIC= uv run email-agent
+```
+
+This uses 15 made-up emails, with phone alerts off so fake mail doesn't buzz your
+phone. Click **overdue** or **invoice** (top right) to pretend mail arrived, and watch
+the alert appear. Claude really reads the demo emails (a fraction of a cent).
 
 ## Commands
 
@@ -119,7 +137,7 @@ uv run email-alerts check 200    # the 200 newest emails (stars and labels the i
 | `uv run email-alerts test` | Send a test message to your phone |
 | `uv run email-alerts summary` | Send the summary now instead of waiting for the next hour |
 | `uv run email-alerts check 200` | Check the 200 newest stored emails for alerts |
-| `uv run email-listen preview 200` | Show what *would* be alerted for the 200 newest emails, **changing and sending nothing** |
+| `uv run email-listen preview 200` | Show what *would* be alerted for the 200 newest emails, **changing and sending nothing** (Claude is still called: ~$0.06) |
 | `uv run email-chat` | Chat in the terminal (`/help` lists commands) |
 | `uv run email-ask "question"` | One question, one answer (read-only) |
 | `uv run email-sync` | Copy new mail in now (`--days`, `--max`, `--backfill`, `--html`) |
@@ -137,10 +155,10 @@ there's no restart.
 Check a change with `uv run email-listen preview 200` before relying on it: you see
 exactly which emails would be alerted, and the cost.
 
-Other listeners in `scripts/listeners/`: **work-alerts** (mail from the platforms you
-work with), **flight-price-watch** (Google Flights below `MAX_PRICE_WON`), and three that
-are switched off but kept as examples: triage (labels by type), login-codes,
-security-alerts.
+Other listeners in `scripts/listeners/`: **work-alerts** (mail from the domains in its
+`WORK_SENDERS` list), **flight-price-watch** (Google Flights below `MAX_PRICE_WON`), and
+four that are switched off but kept as examples: triage (labels mail by type),
+finance-labeler, login-codes and security-alerts.
 
 ## Writing your own alert
 
@@ -169,12 +187,12 @@ async def handler(email, context):
 
 | | |
 |---|---|
-| `alert(id, kind, title, message, urgent=False)` | to your **phone**: now if urgent, otherwise in the morning summary. One alert per email. `kind`: action, coupon, money, security, work, travel |
+| `alert(id, kind, title, message, urgent=False)` | to your **phone**: now if urgent, otherwise in the next summary. One alert per email; muted senders are skipped. `kind`: action, coupon, money, security, work, travel |
 | `alert_feedback()` | what you taught on the page: `{"muted": [...], "not_important": [...]}` |
 | `call_claude(prompt, schema, model="haiku")` | one Claude call that returns JSON matching `schema` |
 | `star_email(id)`, `add_label(id, "Label")`, `archive_email(id)`, `mark_read(id)` | change the email |
 | `search_emails(query)`, `read_email(ids)` | look at other emails |
-| `notify(message)` | a notice on the web page only |
+| `notify(message)` | a notice on the web page and in the log only (not your phone) |
 
 Every run is logged to `data/listener_runs-<mailbox>.jsonl`. Decide with free rules
 (sender, keywords) where you can, and use `call_claude` only for the rest.
@@ -188,7 +206,7 @@ Measured on this project's runs (Haiku 5.5 for alerts, Sonnet 5.5 for the chat):
 | Checking one new email | ~$0.0003 |
 | A month of this account (~1,100 emails) | ~$0.35 |
 | One chat question | $0.005 – $0.07 |
-| `uv run pytest --live` (all live tests) | ~$0.20 |
+| `uv run pytest --live` (all live tests) | ~$0.25 |
 | `uv run pytest` (offline tests) | free |
 
 The budget cap (`MAX_BUDGET_USD`) stops a chat conversation once it has spent that much.
@@ -197,10 +215,16 @@ The budget cap (`MAX_BUDGET_USD`) stops a chat conversation once it has spent th
 
 - **Your secrets stay in `.env`.** It is git-ignored and never printed, and the agent's
   file tools are blocked from reading it. That includes the ntfy topic.
-- **Gmail is read-only apart from stars and the Alerts label.** Syncing never marks mail
-  as read. Nothing can send, forward or delete email; that code doesn't exist.
-- **Login codes never leave your computer.** Code emails are skipped, security alerts
-  have 6-digit codes blanked, and logs blank them too.
+- **What Claude sees.** To decide, the text of each new email (the first 5,000
+  characters, never attachments) is sent to Anthropic's API. Login-code emails and
+  muted senders are skipped. In the chat, Claude reads the emails it needs to answer you.
+- **Gmail changes are small and listed.** On its own, the agent only stars important
+  emails and adds the Alerts label. Syncing never marks mail as read. Other changes
+  happen only when you approve them in the chat or run a `/run` action yourself.
+  Nothing can send, forward or delete email; that code doesn't exist.
+- **Login codes stay off your phone and out of the logs.** Code emails are never
+  alerted (or sent to Claude by the alert listener), security alerts have 6-digit codes
+  blanked, and logs blank them too.
 - **Emails are data, not instructions.** Prompts wrap each email in `<email>` tags
   marked as data, and the agent is told never to obey instructions inside emails.
 - **Every change from the chat asks you first**: mail changes and file writes, with the
@@ -220,19 +244,22 @@ uv run pytest            # offline: free, ~5 seconds (Claude, Gmail and ntfy are
 uv run pytest --live     # also the live tests: real Claude calls and a read-only Gmail sync
 ```
 
-Tests never touch your real mail, your `scripts/` folder or your phone.
+Tests never change your real mail or your `scripts/` folder, and never reach your phone.
+The live Gmail test only reads (read-only sync), and is skipped if `.env` has no Gmail details.
 
 ## Project layout
 
 ```
 email_agent/
-  core/            config.py (settings from .env), claude_json.py (call_claude)
+  core/            config.py (settings from .env), claude_json.py (call_claude),
+                   watch_lock.py (only one program watches Gmail)
   mail/            database.py, mailbox.py, imap_sync.py (read-only Gmail sync),
                    idle_watcher.py (instant new-mail notice), actions.py (star, label...)
   automation/      alerts.py (phone, summary, done/mute), listeners.py (running listeners),
                    listen.py (email-watch, preview, demo), user_actions.py (/run actions)
   agent/           options.py (instructions), tools.py, guard.py (where files may be written)
-  apps/            server.py + web/ (the Alerts page), chat.py, ask.py
+  apps/            server.py + web/ (the Alerts page), chat.py, ask.py,
+                   autostart.py (email-autostart: start at login)
 scripts/listeners/ important_mail.py and your other listeners
 scripts/actions/   one-click actions for the chat (/run)
 .claude/skills/listener-creator/  how the agent writes listeners

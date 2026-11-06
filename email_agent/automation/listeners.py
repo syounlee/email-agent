@@ -155,18 +155,19 @@ class ScriptContext:
 
     async def alert(self, email_id: str, kind: str, title: str, message: str,
                     urgent: bool = False) -> None:
-        """An important email: to your phone now (urgent) or in the morning summary.
+        """An important email: to your phone now (urgent) or in the next summary.
 
         kind: "action", "coupon", "money", "security", "work" or "travel" (the icon).
-        One alert per email: if another listener already alerted, nothing happens.
+        Nothing happens if another listener already alerted about this email, or
+        if you muted its sender.
         """
         from email_agent.automation.alerts import send_alert  # avoids a circular import
 
         if kind == "security":
             message = mask_codes(message)  # never send a login code anywhere
         pushed = await send_alert(email_id, kind, title, message, urgent, show=self.show)
-        if pushed is None:  # another listener already alerted about this email
-            self.actions.append(f"already alerted: {title}")
+        if isinstance(pushed, str):  # "already alerted" or "sender muted"
+            self.actions.append(f"{pushed}: {title}")
             return
         if not load_config().ntfy_topic:
             when = "phone alerts off"

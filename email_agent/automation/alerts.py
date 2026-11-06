@@ -194,21 +194,30 @@ def stats(days: int = 7, now: datetime | None = None, path=None) -> dict:
     return {"days": days, "emails": emails, "alerts": alerted, "counts": counts, "muted": muted}
 
 
-def already_alerted(email_id: str, path=None) -> bool:
+def why_skip(email_id: str, path=None) -> str | None:
+    """'already alerted' (one alert per email), 'sender muted', or None to go ahead."""
     with closing(open_alerts(path)) as conn:
-        return conn.execute("SELECT 1 FROM alerts WHERE email_id = ?",
-                            (email_id,)).fetchone() is not None
+        if conn.execute("SELECT 1 FROM alerts WHERE email_id = ?", (email_id,)).fetchone():
+            return "already alerted"
+        row = conn.execute("SELECT sender FROM emails WHERE id = ?", (email_id,)).fetchone()
+        if row and conn.execute("SELECT 1 FROM muted_senders WHERE sender = ?",
+                                (sender_address(row["sender"]),)).fetchone():
+            return "sender muted"
+    return None
 
 
 async def send_alert(email_id: str, kind: str, title: str, message: str, urgent: bool,
-                     show=print) -> bool | None:
+                     show=print) -> bool | str:
     """What context.alert does: save the alert, and push it now if urgent.
 
-    One alert per email: returns None (and does nothing) if this email already
-    has one, e.g. from another listener.
+    Returns True if it reached the phone now, False if it waits for the summary,
+    or a reason it was skipped: 'already alerted' (one alert per email, e.g. from
+    another listener) or 'sender muted' (you pressed Mute; this holds for every
+    listener).
     """
-    if await asyncio.to_thread(already_alerted, email_id):
-        return None
+    skip = await asyncio.to_thread(why_skip, email_id)
+    if skip:
+        return skip
     icon = KINDS.get(kind, "🔔")
     pushed = False
     if urgent:

@@ -189,3 +189,12 @@ def test_summary_hours_setting():
     for bad in ("25", "22-8", "", "x"):
         with pytest.raises(ValueError):
             parse_hours(bad)
+
+
+async def test_mute_holds_for_every_listener(phone):
+    alerts.add_alert("e010", "action", "Offsite", "reply", urgent=False, pushed=False)
+    alerts.set_status(alerts.recent_alerts()[0]["num"], "dismissed", mute=True)
+    # e012 is from the same sender as e010; work-alerts doesn't check mutes itself
+    ctx = ScriptContext("work-alerts", show=lambda _: None)
+    await ctx.alert("e012", "work", "Work: offsite", "From x", urgent=True)
+    assert phone.sent == [] and ctx.actions == ["sender muted: Work: offsite"]
