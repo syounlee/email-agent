@@ -23,12 +23,12 @@
   <!-- whole agent -->
   <rect x="18" y="18" width="1404" height="804" rx="26" fill="#f7f8fa" stroke="#333" stroke-width="2" stroke-dasharray="10 7"/>
   <text x="50" y="62" font-size="26" font-weight="700">email agent</text>
-  <text x="50" y="88" class="s">runs on every new email in the dump Gmail (email-watch, started at login)</text>
+  <text x="50" y="88" class="s">runs on every new email in your mailbox: Gmail, Outlook, iCloud, Yahoo or any IMAP (email-watch)</text>
 
   <!-- trigger -->
   <rect x="510" y="112" width="280" height="84" rx="16" fill="#fff" stroke="#888" stroke-width="2"/>
   <text x="650" y="148" text-anchor="middle" class="h">📨 new email</text>
-  <text x="650" y="176" text-anchor="middle" class="s">Gmail pushes it at once (IDLE)</text>
+  <text x="650" y="176" text-anchor="middle" class="s">your mail server pushes it at once</text>
 
   <!-- email -> model, with the skip check -->
   <line x1="650" y1="196" x2="650" y2="292" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>

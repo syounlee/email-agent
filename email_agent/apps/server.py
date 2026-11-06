@@ -425,6 +425,7 @@ async def post_demo_deliver(request: Request):
 async def get_info(request: Request):
     config = state_of(request).config
     return JSONResponse({"mailbox": config.mailbox, "model": config.model,
+                         "provider": config.provider, "provider_name": config.provider_name,
                          "budget_usd": config.max_budget_usd,
                          "demo_kinds": list(DEMO_EMAILS) if config.mailbox == "demo" else []})
 
@@ -546,13 +547,13 @@ def create_app(config: Config | None = None, *, chat_turn=None, sync_fn=sync,
         enabled = [m.config["id"] for m in state.listeners.enabled()]
         log(f"mailbox: {config.mailbox} | listeners on: {', '.join(enabled) or 'none'}")
         background, watcher = [], None
-        can_watch = config.mailbox == "imap" and config.email_address and config.email_app_password
+        can_watch = config.mailbox == "imap" and config.can_sign_in
         lock = WatchLock(config)
         watch_here = start_watcher_thread  # tests pass False: no Gmail, no summaries
         if watch_here and can_watch and not lock.acquire():
             # email-watch (perhaps auto-started at login) already watches Gmail and
             # sends the alerts; this page then only shows them.
-            log(f"email-watch is already watching Gmail (process {lock.holder()}); "
+            log(f"email-watch is already watching {config.provider_name} (process {lock.holder()}); "
                 "this page shows its alerts")
             watch_here = False
         if watch_here and can_watch:

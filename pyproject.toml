@@ -7,6 +7,7 @@ dependencies = [
     "anthropic>=2.5.0",
     "claude-agent-sdk>=0.2.178",
     "imapclient>=4.1.0",
+    "msal>=1.39.0",
     "python-dotenv>=1.2.4",
     "starlette>=1.10.0",
     "uvicorn[standard]>=0.54.0",
@@ -14,12 +15,13 @@ dependencies = [
 
 [project.scripts]
 # Short names for the commands, e.g. `uv run email-chat`
-email-watch = "email_agent.automation.listen:watch_main"  # watch Gmail, send alerts (leave running)
-email-agent = "email_agent.apps.server:main"      # the Alerts page (also watches Gmail)
+email-watch = "email_agent.automation.listen:watch_main"  # watch your mailbox, send alerts (leave running)
+email-agent = "email_agent.apps.server:main"      # the Alerts page (also watches your mailbox)
 email-chat = "email_agent.apps.chat:run"          # chat in the terminal
 email-ask = "email_agent.apps.ask:main"           # one question, one answer
 email-listen = "email_agent.automation.listen:main"  # watch / demo / preview listeners
-email-sync = "email_agent.mail.imap_sync:main"    # copy Gmail into the local database
+email-sync = "email_agent.mail.imap_sync:main"    # copy your mail into the local database
+email-connect = "email_agent.mail.login:main"     # test the connection (Outlook: sign in once)
 email-alerts = "email_agent.automation.alerts:main"  # phone alerts: list / test / summary
 email-autostart = "email_agent.apps.autostart:main"  # start email-watch at login (on / off / status)
 

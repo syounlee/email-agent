@@ -1,6 +1,6 @@
 """Run the listeners on new mail.
 
-    uv run email-listen                 # MAILBOX=imap: watch Gmail (same as email-watch)
+    uv run email-listen                 # MAILBOX=imap: watch your mailbox (same as email-watch)
     uv run email-listen demo receipt    # MAILBOX=demo: fake an arrival
     uv run email-listen preview 100     # try the listeners on the 100
                                                         # newest stored emails, changing nothing
@@ -14,6 +14,7 @@ import sys
 from datetime import date, timedelta
 
 from email_agent.core.config import load_config
+from email_agent.mail.login import missing_settings
 from email_agent.mail.idle_watcher import start_watcher
 from email_agent.mail.imap_sync import sync
 from collections import Counter
@@ -100,7 +101,7 @@ async def preview(count: int, show=print, claude_client=None) -> dict:
     for label, n in did.most_common():
         show(f"  {n:4}  {label}")
     show(f"\n  {len(flagged)} emails would be starred, alerted or notified "
-         "(📱 phone now, 📬 morning summary, 🔔 web page only):")
+         "(📱 phone now, 📬 next summary, 🔔 web page only):")
     for day, notes in flagged:
         note = (notes[0].replace("would alert (phone now): ", "📱 ")
                 .replace("would alert (summary): ", "📬 ").replace("would notify: ", "🔔 "))
@@ -116,7 +117,7 @@ async def watch_gmail() -> None:
     loop = asyncio.get_running_loop()
 
     def sync_and_run():
-        """Called in the watcher thread when Gmail reports new mail."""
+        """Called in the watcher thread when the mail server reports new mail."""
         try:
             result = sync(config)
             print(f"📬 synced: {result['added']} new")
@@ -127,7 +128,7 @@ async def watch_gmail() -> None:
 
     # Catch up first: anything synced (e.g. by the chat) but not yet seen.
     await asyncio.to_thread(sync_and_run)
-    summary = asyncio.create_task(alerts.summary_loop())  # the morning summary
+    summary = asyncio.create_task(alerts.summary_loop())  # the summaries (SUMMARY_HOURS)
     thread, stop = start_watcher(config, sync_and_run)
     try:
         while thread.is_alive():
@@ -138,20 +139,23 @@ async def watch_gmail() -> None:
 
 
 def watch_main() -> None:
-    """uv run email-watch: just watch Gmail and send alerts. Leave it running."""
+    """uv run email-watch: just watch your mailbox and send alerts. Leave it running."""
     config = load_config()
     if config.mailbox != "imap":
-        sys.exit("email-watch watches Gmail: set MAILBOX=imap in .env. "
+        sys.exit("email-watch watches your real mailbox: set MAILBOX=imap in .env. "
                  "(To try the demo, use  MAILBOX=demo uv run email-agent)")
     lock = WatchLock(config)
     try:
         if not lock.acquire():
             # e.g. the auto-started watcher, or the web page, is already watching
-            print(f"Another program is already watching Gmail (process {lock.holder()}). "
+            print(f"Another program is already watching {config.provider_name} (process {lock.holder()}). "
                   "Waiting until it stops, so mail isn't checked twice... (Ctrl+C to quit)",
                   flush=True)
             lock.acquire(wait=True)
-        print(f"Watching {config.email_address} for important mail. "
+        problem = missing_settings(config)
+        if problem:
+            sys.exit(f"❌ {problem}")
+        print(f"Watching {config.email_address} ({config.provider_name}) for important mail. "
               f"Phone alerts: {'on' if config.ntfy_topic else 'OFF (set NTFY_TOPIC in .env)'}. "
               f"Summaries {config.summary_schedule}. Ctrl+C to stop.", flush=True)
         asyncio.run(watch_gmail())

@@ -12,6 +12,7 @@ import threading
 import time
 
 from email_agent.core.config import Config
+from email_agent.mail.login import sign_in
 
 REIDLE_SECONDS = 9 * 60   # restart IDLE before Gmail's ~10-minute cut-off
 CHECK_SECONDS = 30        # how often we wake up to see if we should stop
@@ -41,7 +42,7 @@ def watch(config: Config, on_new_mail, stop: threading.Event, *, connect=_connec
     while not stop.is_set():
         try:
             with connect(config) as server:
-                server.login(config.email_address, config.email_app_password)
+                sign_in(server, config)
                 server.select_folder(config.imap_folder, readonly=True)
                 show(f"👂 watching {config.imap_folder} for new mail (IMAP IDLE)")
                 if reconnecting:  # mail may have arrived while we were away

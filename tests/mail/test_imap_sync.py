@@ -188,7 +188,7 @@ def _numbered(n):
 @pytest.fixture
 def imap_config(monkeypatch, tmp_path):
     monkeypatch.setenv("MAILBOX", "imap")
-    monkeypatch.setenv("EMAIL_ADDRESS", "me@example.com")
+    monkeypatch.setenv("EMAIL_ADDRESS", "me@gmail.com")
     monkeypatch.setenv("EMAIL_APP_PASSWORD", "not-a-real-password")
     monkeypatch.setenv("SYNC_MAX_EMAILS", "3")
     monkeypatch.setenv("SYNC_DAYS", "7")
@@ -258,8 +258,11 @@ def test_sync_needs_credentials(monkeypatch, tmp_path, imap_db):
     monkeypatch.delenv("EMAIL_ADDRESS", raising=False)
     monkeypatch.delenv("EMAIL_APP_PASSWORD", raising=False)
     cfg = load_config(tmp_path / "no.env")
-    with pytest.raises(ValueError, match="EMAIL_APP_PASSWORD"):
+    with pytest.raises(ValueError, match="EMAIL_ADDRESS"):
         sync(cfg, imap_db, connect=lambda c: FakeServer({}))
+    monkeypatch.setenv("EMAIL_ADDRESS", "me@icloud.com")
+    with pytest.raises(ValueError, match="EMAIL_APP_PASSWORD.*iCloud Mail"):
+        sync(load_config(tmp_path / "no.env"), imap_db, connect=lambda c: FakeServer({}))
 
 
 def test_synced_emails_are_searchable(imap_config, imap_db):
@@ -269,12 +272,12 @@ def test_synced_emails_are_searchable(imap_config, imap_db):
 
 
 @pytest.mark.live
-def test_real_gmail_sync_is_read_only(tmp_path, monkeypatch):
-    """Talks to your real Gmail (free, no Claude). Skipped unless .env has IMAP details."""
+def test_real_mailbox_sync_is_read_only(tmp_path, monkeypatch):
+    """Talks to your real mailbox (free, no Claude). Skipped unless .env has its details."""
     monkeypatch.delenv("MAILBOX")  # use the value from .env
     cfg = load_config()
-    if not (cfg.email_address and cfg.email_app_password):
-        pytest.skip("EMAIL_ADDRESS / EMAIL_APP_PASSWORD not set in .env")
+    if not cfg.can_sign_in:
+        pytest.skip("no mailbox details in .env")
     with closing(database.open_db(tmp_path / "real.db", load_sample=False)) as conn:
         result = sync(cfg, conn)
         assert result["found"] <= cfg.sync_max_emails

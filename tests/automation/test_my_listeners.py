@@ -221,7 +221,7 @@ async def test_preview_command_on_demo_mailbox():
     summary = await preview(15, show=shown.append, claude_client=claude)
     text = "\n".join(shown)
     assert "Preview of 15 emails (nothing was changed)" in text
-    assert "📬 Send the deck" in text  # would go in the morning summary
+    assert "📬 Send the deck" in text  # would go in the next summary
     # important_mail labels all 15 "Alerts" (the fake says every one needs action).
     assert summary["labels"] == {"would add label 'Alerts'": 15}
     assert summary["flagged"] == 15 and len(claude.requests) == 15

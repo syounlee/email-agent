@@ -133,7 +133,7 @@ GMAIL_EMAIL = {
 @pytest.fixture
 def gmail(monkeypatch, tmp_path):
     monkeypatch.setenv("MAILBOX", "imap")
-    monkeypatch.setenv("EMAIL_ADDRESS", "me@example.com")
+    monkeypatch.setenv("EMAIL_ADDRESS", "me@gmail.com")
     monkeypatch.setenv("EMAIL_APP_PASSWORD", "not-real")
     cfg = load_config(tmp_path / "no.env")
     with closing(database.open_db(tmp_path / "emails-imap.db", load_sample=False)) as c:
@@ -190,8 +190,21 @@ def test_email_gone_from_server_is_refused(gmail):
               connect=lambda c: FakeGmail(present=False))
 
 
-def test_labels_need_gmail(gmail):
+def test_archive_needs_gmail(gmail):
     cfg, conn = gmail
-    with pytest.raises(ActionError, match="need Gmail"):
+    with pytest.raises(ActionError, match="needs Gmail"):
         apply("archive", GMAIL_EMAIL["id"], config=cfg, conn=conn,
               connect=lambda c: FakeGmail(gmail=False))
+
+
+def test_other_servers_star_for_real_and_keep_labels_locally(gmail):
+    """Outlook, iCloud, Yahoo: no Gmail labels, but an alert's label must not fail."""
+    cfg, conn = gmail
+    server = FakeGmail(gmail=False)
+    message = apply("add_label", GMAIL_EMAIL["id"], "Alerts", config=cfg, conn=conn,
+                    connect=lambda c: server)
+    assert message.endswith("(this computer only).")
+    assert not [c for c in server.calls if c[0] == "add_gmail_labels"]  # server left alone
+    assert "Alerts" in get(conn, GMAIL_EMAIL["id"])["labels"]
+    apply("star", GMAIL_EMAIL["id"], config=cfg, conn=conn, connect=lambda c: server)
+    assert server.calls[-1] == ("add_flags", [812], [b"\\Flagged"])  # a real star

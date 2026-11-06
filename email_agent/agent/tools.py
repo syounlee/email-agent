@@ -89,7 +89,7 @@ async def read_email_tool(args: dict) -> dict:
 @tool(
     "list_alerts",
     "The alerts the important-mail listener sent the user (to their phone right away, "
-    "or in the morning summary), newest first, plus what the user taught it: muted "
+    "or in the next summary), newest first, plus what the user taught it: muted "
     "senders and alerts they marked not important. Use for 'what did I miss?', 'why did "
     "you alert me about X?' or 'what codes do I have?'. Each alert has email_id: call "
     "read_email on it for the full email.",

@@ -19,6 +19,32 @@ DEFAULT_DATA_DIR = "data/"
 DEFAULT_MAILBOX = "demo"
 MAILBOX_CHOICES = ("demo", "imap")
 DEFAULT_IMAP_HOST = "imap.gmail.com"
+
+# The email services this agent knows how to connect to. EMAIL_PROVIDER picks
+# one; when it is empty, it is guessed from the end of EMAIL_ADDRESS.
+#   name: shown on the page and in messages; host: its IMAP server;
+#   oauth: True = sign in through the provider's web page (uv run email-login)
+#          instead of an app password.
+PROVIDERS = {
+    "gmail":   {"name": "Gmail", "host": "imap.gmail.com", "oauth": False,
+                "domains": ("gmail.com", "googlemail.com")},
+    "outlook": {"name": "Outlook", "host": "outlook.office365.com", "oauth": True,
+                "domains": ("outlook.com", "hotmail.com", "live.com", "msn.com")},
+    "icloud":  {"name": "iCloud Mail", "host": "imap.mail.me.com", "oauth": False,
+                "domains": ("icloud.com", "me.com", "mac.com")},
+    "yahoo":   {"name": "Yahoo Mail", "host": "imap.mail.yahoo.com", "oauth": False,
+                "domains": ("yahoo.com", "ymail.com", "rocketmail.com")},
+    "other":   {"name": "your mail server", "host": "", "oauth": False, "domains": ()},
+}
+
+
+def guess_provider(address: str) -> str:
+    """'me@hotmail.com' -> 'outlook'. Unknown domains -> 'other'."""
+    domain = address.rsplit("@", 1)[-1].strip().lower()
+    for key, info in PROVIDERS.items():
+        if domain in info["domains"] or domain.startswith("yahoo.") and key == "yahoo":
+            return key
+    return "other"
 DEFAULT_IMAP_FOLDER = "INBOX"
 DEFAULT_SYNC_MAX_EMAILS = 30
 DEFAULT_SYNC_DAYS = 7
@@ -39,6 +65,7 @@ class Config:
     mailbox: str = DEFAULT_MAILBOX
     email_address: str = ""
     email_app_password: str = field(default="", repr=False)  # never shown
+    provider: str = "gmail"  # a key of PROVIDERS
     imap_host: str = DEFAULT_IMAP_HOST
     imap_folder: str = DEFAULT_IMAP_FOLDER
     sync_max_emails: int = DEFAULT_SYNC_MAX_EMAILS
@@ -52,6 +79,26 @@ class Config:
     # Sender domains whose mail always alerts you (work-alerts). Kept in .env,
     # not in the code, because they say where you work.
     work_senders: tuple = ()
+    # Outlook only: the "Application (client) ID" of your own Microsoft app
+    # registration, needed for the Microsoft sign-in (see the README).
+    outlook_client_id: str = ""
+
+    @property
+    def provider_name(self) -> str:
+        """'Gmail', 'Outlook', 'iCloud Mail', ..."""
+        return PROVIDERS[self.provider]["name"]
+
+    @property
+    def uses_oauth(self) -> bool:
+        """True: sign in through the provider's web page, not an app password."""
+        return PROVIDERS[self.provider]["oauth"]
+
+    @property
+    def can_sign_in(self) -> bool:
+        """Is there enough in .env to connect to the mailbox?"""
+        if not (self.email_address and self.imap_host):
+            return False
+        return bool(self.outlook_client_id) if self.uses_oauth else bool(self.email_app_password)
 
     @property
     def summary_schedule(self) -> str:
@@ -113,6 +160,12 @@ def load_config(env_file: Path | None = None) -> Config:
     if mailbox not in MAILBOX_CHOICES:
         raise ValueError(f"MAILBOX must be one of {MAILBOX_CHOICES}, not {mailbox!r}")
 
+    address = getenv("EMAIL_ADDRESS", "").strip()
+    provider = (getenv("EMAIL_PROVIDER") or guess_provider(address) if address else
+                getenv("EMAIL_PROVIDER") or "gmail").strip().lower()
+    if provider not in PROVIDERS:
+        raise ValueError(f"EMAIL_PROVIDER must be one of {tuple(PROVIDERS)}, not {provider!r}")
+
     return Config(
         anthropic_api_key=getenv("ANTHROPIC_API_KEY", ""),
         model=getenv("MODEL") or DEFAULT_MODEL,
@@ -123,7 +176,8 @@ def load_config(env_file: Path | None = None) -> Config:
         email_address=getenv("EMAIL_ADDRESS", "").strip(),
         # Google shows app passwords in groups of 4 with spaces; spaces are fine.
         email_app_password=getenv("EMAIL_APP_PASSWORD", "").replace(" ", ""),
-        imap_host=getenv("IMAP_HOST") or DEFAULT_IMAP_HOST,
+        provider=provider,
+        imap_host=(getenv("IMAP_HOST") or PROVIDERS[provider]["host"]).strip(),  # "other": set it
         imap_folder=getenv("IMAP_FOLDER") or DEFAULT_IMAP_FOLDER,
         sync_max_emails=int(getenv("SYNC_MAX_EMAILS") or DEFAULT_SYNC_MAX_EMAILS),
         sync_days=int(getenv("SYNC_DAYS") or DEFAULT_SYNC_DAYS),
@@ -131,6 +185,7 @@ def load_config(env_file: Path | None = None) -> Config:
         ntfy_topic=(getenv("NTFY_TOPIC") or "").strip(),
         ntfy_server=(getenv("NTFY_SERVER") or DEFAULT_NTFY_SERVER).rstrip("/"),
         work_senders=parse_list(getenv("WORK_SENDERS") or ""),
+        outlook_client_id=(getenv("OUTLOOK_CLIENT_ID") or "").strip(),
         summary_hours=parse_hours(getenv("SUMMARY_HOURS") or getenv("SUMMARY_HOUR")
                                   or DEFAULT_SUMMARY_HOURS),
     )

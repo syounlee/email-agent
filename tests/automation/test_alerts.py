@@ -1,4 +1,4 @@
-"""Tests for phone alerts and the morning summary. Free: the network is faked."""
+"""Tests for phone alerts and the summary. Free: the network is faked."""
 
 import json
 from datetime import date, datetime

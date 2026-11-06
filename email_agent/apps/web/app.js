@@ -13,6 +13,7 @@ const FILTERS = [["new", "New"], ["done", "Done"], ["dismissed", "Not important"
 let filter = "new";       // which alerts the list shows
 let selected = null;      // the alert whose email is open
 let mailbox = "demo";
+let provider = "gmail";   // which email service (gmail, outlook, icloud, yahoo, other)
 let phoneOn = false;
 let showText = false;     // show HTML emails as plain text instead of a web page
 const imagesAllowed = new Set();  // emails whose pictures from the web you allowed
@@ -184,7 +185,7 @@ async function openAlert(alert) {
       el("div", { class: "meta" },
         el("div", {}, el("b", {}, "From: "), email.from),
         el("div", {}, el("b", {}, "Date: "), new Date(email.date).toLocaleString()),
-        mailbox === "imap"
+        mailbox === "imap" && provider === "gmail"
           ? el("div", {}, el("a", { href: gmailLink(email.id), target: "_blank",
               rel: "noopener noreferrer" }, "Open in Gmail ↗")) : null),
       email.has_html ? viewSwitch(alert, asPage) : null,
@@ -345,7 +346,9 @@ function connect() {
 
 async function setupHeader() {
   const info = await api("/api/info");
-  $("#mode").textContent = info.mailbox === "demo" ? "demo mailbox" : "watching Gmail";
+  provider = info.provider;
+  $("#mode").textContent = info.mailbox === "demo" ? "demo mailbox"
+                                                   : "watching " + info.provider_name;
   const area = $("#arrive");
   if (info.mailbox === "demo") {
     area.append(el("span", { class: "muted" }, "Pretend new mail: "));

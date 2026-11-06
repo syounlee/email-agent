@@ -30,6 +30,7 @@ from html.parser import HTMLParser
 
 from email_agent.mail import database
 from email_agent.core.config import Config, load_config
+from email_agent.mail.login import missing_settings, sign_in
 
 MAX_BODY_CHARS = 20_000  # long newsletters get cut so they don't flood Claude
 FETCH_BATCH = 50  # download this many emails per request (and save after each batch)
@@ -201,14 +202,14 @@ def sync(config: Config | None = None, conn=None, connect=_connect, today: date 
     `connect` and `today` can be swapped in tests.
     """
     config = config or load_config()
-    if not (config.email_address and config.email_app_password):
-        raise ValueError("Set EMAIL_ADDRESS and EMAIL_APP_PASSWORD in .env for MAILBOX=imap.")
+    if missing_settings(config):
+        raise ValueError(f"{missing_settings(config)} (needed for MAILBOX=imap)")
 
     own_conn = conn is None
     conn = conn or database.open_db(database.default_db_path("imap"), load_sample=False)
     try:
         with connect(config) as server:
-            server.login(config.email_address, config.email_app_password)
+            sign_in(server, config)
             info = server.select_folder(config.imap_folder, readonly=True)  # read-only!
             uidvalidity = int(info[b"UIDVALIDITY"])
 
@@ -260,14 +261,14 @@ def fetch_missing_html(config: Config | None = None, conn=None, connect=_connect
     so they are not asked for again. Returns how many emails got HTML.
     """
     config = config or load_config()
-    if not (config.email_address and config.email_app_password):
-        raise ValueError("Set EMAIL_ADDRESS and EMAIL_APP_PASSWORD in .env for MAILBOX=imap.")
+    if missing_settings(config):
+        raise ValueError(f"{missing_settings(config)} (needed for MAILBOX=imap)")
     own_conn = conn is None
     conn = conn or database.open_db(database.default_db_path("imap"), load_sample=False)
     found = 0
     try:
         with connect(config) as server:
-            server.login(config.email_address, config.email_app_password)
+            sign_in(server, config)
             info = server.select_folder(config.imap_folder, readonly=True)  # read-only!
             uidvalidity = int(info[b"UIDVALIDITY"])
             missing = database.uids_without_html(conn, config.imap_folder, uidvalidity)
@@ -290,7 +291,7 @@ def fetch_missing_html(config: Config | None = None, conn=None, connect=_connect
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Copy recent Gmail into the database (read-only).")
+    parser = argparse.ArgumentParser(description="Copy recent mail into the database (read-only).")
     parser.add_argument("--days", type=int, help="look back this many days (default: SYNC_DAYS)")
     parser.add_argument("--max", type=int, help="at most this many emails (default: SYNC_MAX_EMAILS)")
     parser.add_argument("--backfill", action="store_true",

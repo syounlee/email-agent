@@ -16,7 +16,7 @@ Each listener file has:
   and call_claude(prompt, schema, model="haiku").
 
 Listener changes run WITHOUT the y/n question: they are your own scripts.
-In imap mode they change your real Gmail.
+In imap mode they change your real mailbox.
 """
 
 import asyncio

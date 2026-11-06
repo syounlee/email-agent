@@ -67,7 +67,7 @@ def turn_on(keep_awake: bool = False, run=subprocess.run, agents_dir: Path = AGE
     if not program.exists():
         raise RuntimeError(f"{program} is missing: run  uv sync  first")
     if load_config().mailbox != "imap":
-        raise RuntimeError("email-watch watches Gmail: set MAILBOX=imap in .env first")
+        raise RuntimeError("email-watch watches your real mailbox: set MAILBOX=imap in .env first")
     if is_loaded(run):  # already on: replace it with the new settings
         run(["launchctl", "bootout", f"{_domain()}/{LABEL}"], capture_output=True)
     log_path().parent.mkdir(parents=True, exist_ok=True)
@@ -101,7 +101,7 @@ def status_text(run=subprocess.run, agents_dir: Path = AGENTS_DIR, log_lines: in
                         "email-watch is NOT running right now (see the log below)."))
     holder = WatchLock().holder()
     if holder:
-        lines.append(f"Gmail is being watched by process {holder}.")
+        lines.append(f"{load_config().provider_name} is being watched by process {holder}.")
     log = log_path()
     if log.exists():
         tail = log.read_text(encoding="utf-8", errors="replace").splitlines()[-log_lines:]

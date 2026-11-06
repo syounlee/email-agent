@@ -227,7 +227,7 @@ async def send_alert(email_id: str, kind: str, title: str, message: str, urgent:
     return pushed
 
 
-# ---------- the morning summary ----------
+# ---------- the summary of waiting alerts ----------
 
 def summary_text(items: list[dict]) -> tuple[str, str]:
     """Title and text of the summary push: one line per alert, grouped by kind."""

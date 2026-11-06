@@ -1,7 +1,7 @@
 """Important mail: read every new email and alert you only about what matters.
 
 Made for an address you give out freely: most of its mail is noise, but now
-and then something needs you. Claude (Haiku, ~$0.0002 per email) reads each
+and then something needs you. Claude (Haiku, ~$0.0003 per email) reads each
 email and decides whether it is one of:
 
   action    something you must do: confirm, pay, reply, renew, an account
@@ -13,8 +13,8 @@ email and decides whether it is one of:
   security  a new sign-in, password change or suspicious activity
 
 Urgent ones (security warnings, or a deadline/expiry within URGENT_DAYS) go to
-your phone right away; the rest wait for the morning summary. Important emails
-are also starred and labeled "Alerts", so the web page has an Alerts tab.
+your phone right away; the rest wait for the next summary (SUMMARY_HOURS in .env).
+Important emails are also starred, and labeled "Alerts" in Gmail.
 Login codes you asked for yourself are skipped: you are already waiting for them.
 
 It learns from the Alerts page: senders you mute are skipped (no Claude call),
@@ -26,14 +26,14 @@ from datetime import date
 
 config = {
     "id": "important-mail",
-    "name": "Alert me about important emails (phone now, or morning summary)",
+    "name": "Alert me about important emails (phone now, or in the summary)",
     "enabled": True,
     "event": "email_received",
 }
 
 URGENT_DAYS = 3        # a deadline within this many days counts as urgent
 INCLUDE_RECEIPTS = False  # True: also alert about receipts for things you just bought
-LABEL = "Alerts"       # the Gmail label (and web page tab) for important emails
+LABEL = "Alerts"       # the label for important emails (in Gmail; kept locally elsewhere)
 MAX_BODY_CHARS = 5000  # enough to find a code at the bottom of most emails
 
 CODE_SUBJECT = re.compile(

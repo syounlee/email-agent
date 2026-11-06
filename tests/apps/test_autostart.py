@@ -92,7 +92,7 @@ def test_web_page_leaves_watching_to_email_watch(monkeypatch, tmp_path):
     from email_agent.core.config import load_config
 
     monkeypatch.setenv("MAILBOX", "imap")
-    monkeypatch.setenv("EMAIL_ADDRESS", "me@example.com")
+    monkeypatch.setenv("EMAIL_ADDRESS", "me@gmail.com")
     monkeypatch.setenv("EMAIL_APP_PASSWORD", "not-real")
     started = []
     monkeypatch.setattr(server, "start_watcher", lambda *a, **k: started.append(1))

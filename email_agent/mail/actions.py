@@ -5,10 +5,11 @@ If the server says no, the database is left alone, so it never claims a
 change that didn't happen. In demo mode there is no server: only the demo
 database changes.
 
-Gmail notes:
-- star = the \\Flagged flag, read = the \\Seen flag (ordinary IMAP flags);
-- labels are Gmail's X-GM-LABELS, not flags;
-- archive = remove the \\Inbox label (the email stays in All Mail).
+Star = the \\Flagged flag and read = the \\Seen flag work on every IMAP
+server (Gmail, Outlook, iCloud Mail, Yahoo Mail...).
+Labels and archive are Gmail's own (X-GM-LABELS; archive = remove \\Inbox).
+On other servers a label is kept on this computer only (the server is left
+alone), and archive isn't available.
 
 Nothing here sends or deletes mail.
 """
@@ -17,6 +18,7 @@ from contextlib import closing
 
 from email_agent.mail import database
 from email_agent.core.config import Config, load_config
+from email_agent.mail.login import sign_in
 
 ACTIONS = ("archive", "star", "unstar", "mark_read", "mark_unread", "add_label", "remove_label")
 LABEL_ACTIONS = ("add_label", "remove_label")
@@ -70,25 +72,30 @@ def _connect(config: Config):
     return IMAPClient(config.imap_host, ssl=True, timeout=30)
 
 
-def _change_server(config: Config, email: dict, action: str, label: str | None, connect) -> None:
-    """Make the change on the IMAP server. Raises ActionError if it can't."""
+def _change_server(config: Config, email: dict, action: str, label: str | None, connect) -> str:
+    """Make the change on the IMAP server. Raises ActionError if it can't.
+
+    Returns "" normally, or a note such as "this computer only"."""
     if email.get("uid") is None or not email.get("folder"):
         raise ActionError("This email has no server location; try syncing again.")
     if not any(_is_inbox(l) for l in email["labels"]):
         raise ActionError("This email is no longer in your inbox, so it can't be changed here.")
 
     with connect(config) as server:
-        server.login(config.email_address, config.email_app_password)
+        sign_in(server, config)
         info = server.select_folder(email["folder"])  # read-write this time
         if int(info[b"UIDVALIDITY"]) != email["uidvalidity"]:
-            raise ActionError("Gmail renumbered this folder. Please sync again first.")
+            raise ActionError(f"{config.provider_name} renumbered this folder. Please sync again first.")
 
         uid = [email["uid"]]
         if not server.fetch(uid, ["FLAGS"]):  # make sure it's still there
-            raise ActionError("The email is no longer in this folder (moved or deleted in Gmail?).")
+            raise ActionError("The email is no longer in this folder (moved or deleted?).")
 
-        if action in ("archive", *LABEL_ACTIONS) and not server.has_capability("X-GM-EXT-1"):
-            raise ActionError("Labels and archive need Gmail; this server doesn't support them.")
+        if not server.has_capability("X-GM-EXT-1"):  # not Gmail: no labels, no archive
+            if action == "archive":
+                raise ActionError(f"Archive needs Gmail; {config.provider_name} doesn't have it.")
+            if action in LABEL_ACTIONS:
+                return "this computer only"  # the label is kept in the local database
 
         if action == "star":
             server.add_flags(uid, [b"\\Flagged"])
@@ -104,6 +111,7 @@ def _change_server(config: Config, email: dict, action: str, label: str | None, 
             server.add_gmail_labels(uid, [label])
         elif action == "remove_label":
             server.remove_gmail_labels(uid, [label])
+    return ""
 
 
 # ---------- the one function the tools call ----------
@@ -125,13 +133,15 @@ def apply(action: str, email_id: str, label: str | None = None, *,
             raise ActionError(f"No email with id {email_id!r}. Search for it first.")
         email = found[0]
 
+        note = ""
         if config.mailbox == "imap":
             try:
-                _change_server(config, email, action, label, connect)
+                note = _change_server(config, email, action, label, connect)
             except ActionError:
                 raise
             except Exception as problem:  # network, login, server refusal
-                raise ActionError(f"Gmail refused the change ({type(problem).__name__}: {problem}). "
+                raise ActionError(f"{config.provider_name} refused the change "
+                                  f"({type(problem).__name__}: {problem}). "
                                   "Nothing was changed.") from problem
 
         database.update_state(conn, email_id, **new_state(email, action, label))
@@ -144,7 +154,7 @@ def apply(action: str, email_id: str, label: str | None = None, *,
         "mark_read": "Marked as read", "mark_unread": "Marked as unread",
         "add_label": f"Added label '{label}' to", "remove_label": f"Removed label '{label}' from",
     }[action]
-    return f"{done} '{email['subject']}'."
+    return f"{done} '{email['subject']}'" + (f" ({note})." if note else ".")
 
 
 def approval_question(action: str, email_id: str, label: str | None = None, conn=None) -> str:

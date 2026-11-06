@@ -22,6 +22,8 @@ def separate_database(tmp_path, monkeypatch):
     monkeypatch.setenv("NTFY_TOPIC", "")    # ...and never buzz your phone
     monkeypatch.setenv("SUMMARY_HOURS", "8")  # same schedule for every test, whatever .env says
     monkeypatch.setenv("WORK_SENDERS", "workplatform.example.com")  # not your real ones
+    monkeypatch.setenv("EMAIL_PROVIDER", "")  # guessed from the address in each test
+    monkeypatch.setenv("OUTLOOK_CLIENT_ID", "")
 
 
 def pytest_collection_modifyitems(config, items):
