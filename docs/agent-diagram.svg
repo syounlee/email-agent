@@ -32,7 +32,7 @@
 
   <!-- email -> model, with the skip check -->
   <line x1="650" y1="196" x2="650" y2="292" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
-  <text x="636" y="222" text-anchor="end" class="s">skip (no Claude call) if:</text>
+  <text x="636" y="222" text-anchor="end" class="s">skip (no model call) if:</text>
   <text x="636" y="242" text-anchor="end" class="s">login code you asked for,</text>
   <text x="636" y="262" text-anchor="end" class="s">sender you muted, already alerted</text>
 
@@ -47,8 +47,8 @@
 
   <!-- model -->
   <rect x="512" y="296" width="276" height="108" rx="20" fill="#3a8ff0"/>
-  <text x="650" y="344" text-anchor="middle" font-size="30" font-weight="600" fill="#fff">✦ Claude</text>
-  <text x="650" y="376" text-anchor="middle" font-size="16" fill="#e6f0ff">Haiku · reads one email</text>
+  <text x="650" y="344" text-anchor="middle" font-size="30" font-weight="600" fill="#fff">✦ model</text>
+  <text x="650" y="376" text-anchor="middle" font-size="16" fill="#e6f0ff">reads one email · e.g. Claude Haiku</text>
   <circle cx="512" cy="296" r="19" fill="#111"/><text x="512" y="302" text-anchor="middle" class="num">1</text>
   <text x="664" y="270" class="lab">reason • important?</text>
 
@@ -72,7 +72,7 @@
   <!-- toolbox -->
   <rect x="930" y="112" width="460" height="356" rx="22" fill="none" stroke="#1e9e5a" stroke-width="2.5" stroke-dasharray="9 7"/>
   <text x="958" y="150" class="h">toolbox</text>
-  <text x="1052" y="150" class="s">(plain code, runs Claude's decision)</text>
+  <text x="1052" y="150" class="s">(plain code, runs the model's decision)</text>
   <rect x="980" y="176" width="360" height="62" rx="16" fill="#fff" stroke="#333" stroke-width="2"/>
   <text x="1160" y="213" text-anchor="middle" class="tool">star_email</text>
   <rect x="980" y="256" width="360" height="62" rx="16" fill="#fff" stroke="#333" stroke-width="2"/>

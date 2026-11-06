@@ -5,14 +5,17 @@ and websites) and tells your phone only when something there matters. It runs on
 own computer: Claude Haiku (through the Anthropic API) sorts the mail, and the chat is
 built with the [Claude Agent SDK](https://pypi.org/project/claude-agent-sdk/) for Python.
 
-![How the agent handles each new email: Claude reads it with your instructions, answers in a fixed form, the code stars and labels it and alerts your phone now or in the hourly summary, and what you mark on the Alerts page teaches it](docs/agent-diagram.png)
+<p align="center">
+  <img src="docs/agent-diagram.png" width="1200"
+       alt="How the agent handles each new email: a model reads it with your instructions, answers in a fixed form, the code stars and labels it and alerts your phone now or in the hourly summary, and what you mark on the Alerts page teaches it">
+</p>
 
 **How it works, for each new email:**
 
-1. **Reason:** Claude Haiku reads it, along with the instructions (which kinds matter, and
-   your past "Not important" examples). Login codes you asked for and muted senders are
-   skipped without asking Claude.
-2. **Answer:** Claude fills in a fixed form: kind, title, detail, deadline, urgent.
+1. **Reason:** a model reads it, along with the instructions (which kinds matter, and
+   your past "Not important" examples). This project uses Claude Haiku. Login codes you
+   asked for and muted senders are skipped without calling the model.
+2. **Answer:** the model fills in a fixed form: kind, title, detail, deadline, urgent.
    Kind "none" means not important, and nothing happens.
 3. **Act:** plain code carries out the answer: it stars the email, labels it "Alerts" and
    saves the alert.
@@ -23,7 +26,10 @@ built with the [Claude Agent SDK](https://pypi.org/project/claude-agent-sdk/) fo
 
 The diagram's source is [docs/agent-diagram.svg](docs/agent-diagram.svg).
 
-![The Alerts page: alerts on the left, the email behind one in the middle, chat on the right](docs/screenshot.png)
+<p align="center">
+  <img src="docs/screenshot.png" width="1200"
+       alt="The Alerts page: alerts on the left, the email behind one in the middle, chat on the right">
+</p>
 
 ## What it does
 
