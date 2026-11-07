@@ -128,7 +128,7 @@ class ScriptContext:
         self.claude_calls: list[dict] = []   # model, tokens, cost of each call
 
     async def _apply(self, action: str, email_id: str, label: str | None = None) -> str:
-        # actions.apply may talk to Gmail, so run it off the event loop
+        # actions.apply may talk to the mail server, so run it off the event loop
         message = await asyncio.to_thread(actions.apply, action, email_id, label)
         self.actions.append(message)
         return message

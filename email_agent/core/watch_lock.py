@@ -1,7 +1,7 @@
-"""Make sure only one program watches Gmail at a time.
+"""Make sure only one program watches your mailbox at a time.
 
 email-watch (started by you or automatically at login) and email-agent (the
-web page) can both watch Gmail. If two did it at once, every new email would
+web page) can both watch the mailbox. If two did it at once, every new email would
 be checked twice. Whoever starts first holds this lock; the other one either
 waits (email-watch) or just shows the page (email-agent).
 

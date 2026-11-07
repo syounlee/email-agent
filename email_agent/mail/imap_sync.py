@@ -1,4 +1,4 @@
-"""Copy your newest emails from an IMAP server (e.g. Gmail) into the database.
+"""Copy your newest emails from an IMAP server (Gmail, Outlook, iCloud...) into the database.
 
 READ-ONLY by design:
 - the folder is opened read-only, and

@@ -14,7 +14,8 @@ email and decides whether it is one of:
 
 Urgent ones (security warnings, or a deadline/expiry within URGENT_DAYS) go to
 your phone right away; the rest wait for the next summary (SUMMARY_HOURS in .env).
-Important emails are also starred, and labeled "Alerts" in Gmail.
+Important emails are also starred, and labeled "Alerts" (in Gmail; other
+mailboxes keep the label on this computer).
 Login codes you asked for yourself are skipped: you are already waiting for them.
 
 It learns from the Alerts page: senders you mute are skipped (no Claude call),

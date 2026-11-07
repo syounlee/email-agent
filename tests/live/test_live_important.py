@@ -1,4 +1,5 @@
-"""Live test: does Claude (Haiku) tell important dump-account mail from noise?
+"""Live test: does Claude (Haiku) tell important mail from noise
+(for an address you give out freely)?
 Uses made-up emails and a preview context (nothing changes, nothing is sent).
 About a tenth of a cent. Run with --live."""
 

@@ -102,6 +102,9 @@ async function loadAlerts() {
             "which alerts you opened.", "error");
     }
     showStats(data);
+    // The open email's alert left this list (marked Done, Not important or muted,
+    // here or in another browser): clear the middle so it matches the list.
+    if (selected && !data.alerts.some((alert) => alert.num === selected.num)) closeReader();
     $("#alert-list").replaceChildren(...data.alerts.map(alertCard));
     if (!data.alerts.length) {
       $("#alert-list").append(el("li", { class: "muted center" },
@@ -177,6 +180,8 @@ function alertCard(alert) {
     el("div", { class: "line1" },
       el("span", { class: "title" },
         (KINDS[alert.kind] || "🔔") + " " + alert.title,
+        alert.urgent ? el("span", { class: "urgent-tag", title: "Urgent: needs you soon (goes to your phone at once)" },
+          "Urgent") : null,
         alert.seen || !canMarkSeen ? null
           : el("span", { class: "new-tag", title: "You haven't opened this one yet" }, "New")),
       el("span", { class: "time" }, shortTime(alert.created))),
@@ -202,6 +207,14 @@ async function markSeen(alert, seen) {
   } catch (problem) { toast(problem.message, "error"); }
 }
 
+// Back to the "click an alert" note that the middle shows at the start.
+let readerIntro = null;  // saved at start-up
+function closeReader() {
+  selected = null;
+  $("#reader").classList.remove("page-mode");
+  $("#reader").replaceChildren(...readerIntro.map((node) => node.cloneNode(true)));
+}
+
 async function openAlert(alert) {
   selected = alert;
   document.querySelectorAll(".alert").forEach((card) => {
@@ -212,6 +225,7 @@ async function openAlert(alert) {
   if (!alert.seen && canMarkSeen) markSeen(alert, true);
   try {
     const email = await api("/api/email/" + encodeURIComponent(alert.email_id));
+    if (selected !== alert) return;  // closed or another one opened while it loaded
     const asPage = email.has_html && !showText;
     $("#reader").classList.toggle("page-mode", asPage);
     const parts = [
@@ -456,6 +470,7 @@ function setupTheme() {
 // ---------- start ----------
 
 document.addEventListener("DOMContentLoaded", () => {
+  readerIntro = [...$("#reader").childNodes].map((node) => node.cloneNode(true));
   $("#chat-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const text = $("#chat-input").value.trim();

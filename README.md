@@ -94,9 +94,11 @@ page or plain text), then mark it:
 Alerts you haven't opened yet are **bold with a dot and a NEW tag**, like unread mail, and
 their number shows on the To do tab and in the browser tab, e.g. "(2) Email Alerts".
 Opening one removes the tag (on every browser, and it stays that way after a restart);
-**● Mark as new** in the email puts it back. An alert stays in To do until you mark it. The **Theme** menu at the top
-switches between Auto (follows your computer), Light, Dark, Paper (warm, easy on the eyes)
-and High contrast; the page remembers your choice.
+**● Mark as new** in the email puts it back. An alert stays in To do until you mark it.
+
+The **Theme** menu at the top switches between Auto (follows your computer), Light, Dark,
+Paper (warm, easy on the eyes) and High contrast. Emails follow the theme too (dark in Dark
+mode), and the page remembers your choice.
 
 The chat beside it answers questions about your mail and alerts ("What did I miss this
 week?", "Which coupon codes do I have?"). It can also edit the alert rules for you ("Stop
@@ -245,8 +247,8 @@ For an account you only check now and then, also set `SYNC_MAX_EMAILS=500` and
 
 Mail is copied into a local database (`data/emails-imap.db`) **read-only**: nothing is
 marked as read. On its own, the agent only stars (flags) important emails, plus the
-label **Alerts** where your mailbox has labels. Anything else (archive, mark read, other labels) happens
-only when you ask for it in the chat and approve it.
+label **Alerts** where your mailbox has labels. Anything else (archive, mark read, other
+labels) happens only when you ask for it in the chat and approve it.
 
 ### 2. Phone alerts (ntfy)
 
@@ -301,7 +303,7 @@ New mail only is checked. To get alerts about mail that was already in the datab
 before you set this up:
 
 ```bash
-uv run email-alerts check 200    # the 200 newest stored emails (stars and labels the important ones)
+uv run email-alerts check 200    # the 200 newest stored emails (stars the important ones)
 ```
 
 ## Everyday use
@@ -451,9 +453,10 @@ Measured on real runs (Haiku 5.5 for alerts, Sonnet 5.5 for the chat):
   characters, never attachments) is sent to Anthropic's API. Login-code emails and
   muted senders are skipped. In the chat, Claude reads the emails it needs to answer you.
 - **Mailbox changes are small and listed.** On its own, the agent only stars important
-  emails, plus the Alerts label where your mailbox has labels. Syncing never marks mail as read. Other
-  changes happen only when you approve them in the chat or run a `/run` action yourself
-  in `email-chat`. Nothing can send, forward or delete email; that code doesn't exist.
+  emails, plus the Alerts label where your mailbox has labels. Syncing never marks mail
+  as read. Other changes happen only when you approve them in the chat or run a `/run`
+  action yourself in `email-chat`. Nothing can send, forward or delete email; that code
+  doesn't exist.
 - **Login codes stay off your phone and out of the logs.** Code emails are never
   alerted (or sent to Claude by the alert listener), security alerts have 6-digit codes
   blanked, and logs blank them too.

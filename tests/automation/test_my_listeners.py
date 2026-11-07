@@ -231,7 +231,7 @@ async def test_preview_command_on_demo_mailbox():
     assert [e["id"] for e in emails if e["starred"]] == ["e014"]  # as in the sample data
 
 
-# ---------- important mail (alerts for the dump account) ----------
+# ---------- important mail (alerts for an address you give out freely) ----------
 
 def answer(kind="none", title="", detail="", deadline="", urgent=False):
     return {"kind": kind, "title": title, "detail": detail, "deadline": deadline,

@@ -70,7 +70,7 @@ class Config:
     imap_folder: str = DEFAULT_IMAP_FOLDER
     sync_max_emails: int = DEFAULT_SYNC_MAX_EMAILS
     sync_days: int = DEFAULT_SYNC_DAYS
-    port: int = DEFAULT_PORT  # the local web server (step 9)
+    port: int = DEFAULT_PORT  # the Alerts page (uv run email-agent)
     # Phone alerts via ntfy. The topic works like a password: anyone who knows
     # it can read your alerts, so it is never shown. Empty = no phone alerts.
     ntfy_topic: str = field(default="", repr=False)

@@ -15,7 +15,7 @@ The topic works like a password, so it is never printed.
     uv run email-alerts test       # send a test message to your phone
     uv run email-alerts summary    # send the summary now
     uv run email-alerts check 200  # check the 200 newest stored emails for alerts
-                                   # (for real: stars and labels them in Gmail)
+                                   # (for real: stars them, and labels them if the mailbox has labels)
 """
 
 import asyncio

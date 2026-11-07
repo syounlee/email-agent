@@ -24,7 +24,7 @@ config = {
     "event": "email_received",
 }
 
-# ---- labels it may add (type -> Gmail label) ----
+# ---- labels it may add (type -> label; kept on this computer if the mailbox has no labels) ----
 LABELS = {
     "news": "News", "promotions": "Promotions", "finance": "Finance", "social": "Social",
     "work": "Work", "security": "Security", "travel": "Travel",

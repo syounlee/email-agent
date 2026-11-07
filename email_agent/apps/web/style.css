@@ -115,7 +115,6 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: 420px 1fr 3
 .alert-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
 .alert { position: relative; padding: 10px 12px 10px 26px; border-bottom: 1px solid var(--line); cursor: pointer; border-left: 4px solid transparent; }
 .alert:hover { background: var(--hover); }
-.alert.urgent { border-left-color: var(--bad); }
 .alert .line1 { display: flex; justify-content: space-between; gap: 8px; }
 .alert .time { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .alert .message { margin: 2px 0; }
@@ -130,7 +129,9 @@ main { flex: 1; min-height: 0; display: grid; grid-template-columns: 420px 1fr 3
 .alert.seen .title { font-weight: 500; }
 .new-tag { margin-left: 6px; padding: 0 6px; border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; vertical-align: 2px; background: var(--unseen); color: var(--on-accent); }
 .alert.seen .message { color: var(--muted); }
-.alert.selected, .alert.selected:hover { background: var(--accent-soft); }
+/* the bar on the left marks the alert whose email is open in the middle */
+.alert.selected, .alert.selected:hover { background: var(--accent-soft); border-left-color: var(--accent); }
+.urgent-tag { margin-left: 6px; padding: 0 6px; border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; vertical-align: 2px; background: var(--bad-soft); color: var(--bad); border: 1px solid var(--bad); }
 
 /* ---------- middle: the email behind an alert ---------- */
 

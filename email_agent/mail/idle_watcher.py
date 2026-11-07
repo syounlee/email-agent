@@ -1,8 +1,8 @@
 """Wait for new mail with IMAP IDLE, in a background thread.
 
 IDLE means: "server, tell me the moment something changes" (no polling).
-Gmail drops an IDLE after about 10 minutes of silence, so we stop and
-re-start it every 9 minutes. When the server says a message EXISTS (new
+Mail servers drop a quiet IDLE after a while (Gmail after about 10 minutes),
+so we stop and re-start it every 9 minutes. When the server says a message EXISTS (new
 mail), we call on_new_mail(); the caller then syncs and runs the listeners.
 
 The IDLE connection opens the folder read-only: it only watches.
@@ -14,7 +14,7 @@ import time
 from email_agent.core.config import Config
 from email_agent.mail.login import sign_in
 
-REIDLE_SECONDS = 9 * 60   # restart IDLE before Gmail's ~10-minute cut-off
+REIDLE_SECONDS = 9 * 60   # restart IDLE before the server cuts it off (Gmail: ~10 minutes)
 CHECK_SECONDS = 30        # how often we wake up to see if we should stop
 RETRY_SECONDS = 30        # wait after a dropped connection before reconnecting
 

@@ -345,7 +345,7 @@ def test_watcher_starts_and_stops_with_the_server(listeners_dir, fake, monkeypat
     assert started["stop"].is_set() and not started["thread"].is_alive()  # stopped cleanly
 
 
-# ---------- the web page (step 10) ----------
+# ---------- the web page ----------
 
 def test_page_is_served_with_strict_browser_rules(client):
     r = client.get("/")

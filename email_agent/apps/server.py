@@ -584,9 +584,9 @@ def create_app(config: Config | None = None, *, chat_turn=None, sync_fn=sync,
         background, watcher = [], None
         can_watch = config.mailbox == "imap" and config.can_sign_in
         lock = WatchLock(config)
-        watch_here = start_watcher_thread  # tests pass False: no Gmail, no summaries
+        watch_here = start_watcher_thread  # tests pass False: no mail server, no summaries
         if watch_here and can_watch and not lock.acquire():
-            # email-watch (perhaps auto-started at login) already watches Gmail and
+            # email-watch (perhaps auto-started at login) already watches the mailbox and
             # sends the alerts; this page then only shows them.
             log(f"email-watch is already watching {config.provider_name} (process {lock.holder()}); "
                 "this page shows its alerts")
