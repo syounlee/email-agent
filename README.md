@@ -296,6 +296,17 @@ uv run email-autostart off      # stop it, and no more auto-start
 still sleeps). Without it, a sleeping Mac checks nothing; on wake it catches up. Its
 output goes to `data/logs/email-watch.log`.
 
+What auto-start covers:
+
+- **After you restart the Mac**, the watcher starts again as soon as you log in, and
+  first catches up on mail that arrived while the Mac was off.
+- **Only the watcher starts by itself**, not the Alerts page. Run `uv run email-agent`
+  when you want the page; closing it never stops the alerts.
+- **It can't start before you log in.** With FileVault (disk encryption, on by default)
+  the disk stays locked until you enter your password at startup, and that same step
+  logs you in. While the Mac is off, asleep or the lid is closed, nothing is checked;
+  for alerts around the clock, run it on a computer that is always on.
+
 Only one program watches your mailbox at a time: with auto-start on, `email-agent` just
 shows the page, and a second `email-watch` waits until the first one stops.
 
@@ -441,6 +452,7 @@ Measured on real runs (Haiku 5.5 for alerts, Sonnet 5.5 for the chat):
 | `email-alerts test`: no buzz | Check that the topic in the app is exactly `NTFY_TOPIC` (capitals matter) and that notifications for ntfy are allowed on your phone. |
 | No alert for an email you expected | Most mail isn't alert-worthy. `data/logs/email-watch.log` (auto-start) or the `email-watch` window shows what was decided for each email, e.g. `important-mail: not important`. Ask the chat to change the rules, then try `uv run email-listen preview 50`. |
 | No summary this hour | Summaries go out only when something is waiting. See `uv run email-alerts`. |
+| Log: "watcher lost the connection ...; retrying in 30s" | Normal after Wi-Fi drops or the Mac sleeps: it reconnects and catches up by itself. Only if it repeats for minutes, check your internet connection. |
 | "Another program is already watching ..." | Auto-start is already running it; nothing to do. `uv run email-autostart status` shows it. |
 | The page says "Address already in use" | Something else uses port 3000: set `PORT=3001` in `.env`. |
 
