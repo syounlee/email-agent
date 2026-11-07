@@ -409,6 +409,19 @@ def test_html_email_pictures_only_when_asked(client):
     assert "script-src" not in csp and "sandbox" in csp
 
 
+def test_html_email_follows_the_page_theme(client):
+    plain = client.get("/api/email-html/e008").text
+    assert "<style>" not in plain                       # light: the email as it was made
+    dark = client.get("/api/email-html/e008?look=dark&images=1")
+    assert "invert" in dark.text and "<ul" in dark.text  # dark paper, same email
+    assert dark.text.index("invert") < dark.text.index("<ul")  # the look comes first
+    assert "img-src data: https: http:" in dark.headers["content-security-policy"]
+    assert "sepia" in client.get("/api/email-html/e008?look=paper").text
+    assert "invert" in client.get("/api/email-html/e008?look=contrast").text
+    odd = client.get("/api/email-html/e008?look=</style><script>").text
+    assert "<script>" not in odd and "<style>" not in odd  # only known looks, nothing echoed
+
+
 def test_plain_email_has_no_html_page(client):
     assert client.get("/api/email-html/e001").status_code == 404
     assert client.get("/api/email/e008").json()["has_html"] is True
@@ -446,6 +459,33 @@ def test_alerts_list_mark_and_mute(client):
     assert client.get("/api/alerts").json()["alerts"] == []          # not new any more
     assert len(client.get("/api/alerts?status=dismissed").json()["alerts"]) == 1
     assert alerts.feedback()["muted"] == ["orders@bookshop.example.com"]
+
+
+def test_opening_an_alert_marks_it_seen(client):
+    from email_agent.automation import alerts
+    alerts.add_alert("e004", "coupon", "Bookshop: 10% code", "BOOK10", urgent=False, pushed=False)
+    [alert] = client.get("/api/alerts").json()["alerts"]
+    assert alert["seen"] is None and client.get("/api/alerts").json()["stats"]["unseen"] == 1
+    with client.websocket_connect(WS) as ws:
+        r = client.post(f"/api/alerts/{alert['num']}/seen", json={"seen": True})
+        assert r.status_code == 200 and r.json()["seen"]
+        assert receive_until(ws, "alerts_changed")[-1]["type"] == "alerts_changed"  # other tabs
+    assert client.get("/api/alerts").json()["stats"]["unseen"] == 0
+    assert client.post(f"/api/alerts/{alert['num']}/seen", json={"seen": False}).json()["seen"] is None
+    assert client.post("/api/alerts/999/seen", json={"seen": True}).status_code == 404
+    assert client.post(f"/api/alerts/{alert['num']}/seen", json={"seen": "yes"}).status_code == 400
+
+
+def test_page_has_color_themes(client):
+    from email_agent.apps.server import WEB_DIR
+    css = (WEB_DIR / "style.css").read_text()
+    for theme in ("dark", "paper", "contrast"):
+        assert f':root[data-theme="{theme}"]' in css, theme
+    assert "prefers-color-scheme: dark" in css  # "auto" follows the computer
+    assert client.get("/static/theme.js").status_code == 200
+    html = client.get("/").text
+    # theme.js runs before the page is drawn (no defer), so dark mode never flashes white
+    assert '<script src="/static/theme.js"></script>' in html
 
 
 def test_alert_route_checks_its_input(client):

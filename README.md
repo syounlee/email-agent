@@ -81,14 +81,22 @@ target (✈️).
   them in your usual mail app. Mailboxes with labels (Gmail) also get the label "Alerts".
 
 The **Alerts page** (<http://127.0.0.1:3000> while `uv run email-agent` runs) lists the
-alerts, with how many emails arrived this week and how many were worth an alert. Click
-one to see the email (as a web page or plain text), then mark it:
+alerts, with how many emails arrived this week and how many were worth an alert. The
+**To do** tab holds alerts you haven't handled yet. Click one to see the email (as a web
+page or plain text), then mark it:
 
 - **✅ Done** when you've handled it. Handled alerts stay out of the next summary.
 - **🙈 Not important**: Claude is shown your 20 most recent "not important" alerts as
   examples, and skips emails of the same kind from the same sender or about the same thing.
 - **🔇 Mute**: no more alerts from that sender, from any listener. Its emails aren't
   even sent to Claude any more.
+
+Alerts you haven't opened yet are **bold with a dot and a NEW tag**, like unread mail, and
+their number shows on the To do tab and in the browser tab, e.g. "(2) Email Alerts".
+Opening one removes the tag (on every browser, and it stays that way after a restart);
+**● Mark as new** in the email puts it back. An alert stays in To do until you mark it. The **Theme** menu at the top
+switches between Auto (follows your computer), Light, Dark, Paper (warm, easy on the eyes)
+and High contrast; the page remembers your choice.
 
 The chat beside it answers questions about your mail and alerts ("What did I miss this
 week?", "Which coupon codes do I have?"). It can also edit the alert rules for you ("Stop

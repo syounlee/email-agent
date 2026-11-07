@@ -11,6 +11,7 @@ OTHER websites open in your browser from using it behind your back:
 HTTP
     GET  /api/alerts?status=new         alerts (new | done | dismissed | all) + weekly stats
     POST /api/alerts/{num} {"status", "mute"}  mark done / not important, mute the sender
+    POST /api/alerts/{num}/seen {"seen"}       mark opened / not opened yet
     GET  /api/email/{id}
     GET  /api/email-html/{id}?images=1  the email as a web page (shown in a locked frame)
     GET  /api/listeners
@@ -318,6 +319,22 @@ async def post_alert(request: Request):
     return JSONResponse(updated)
 
 
+async def post_alert_seen(request: Request):
+    num = request.path_params["num"]
+    try:
+        body = await json_body(request)
+    except ValueError as problem:
+        return error(400, f"Invalid JSON: {problem}")
+    seen = body.get("seen", True)
+    if not isinstance(seen, bool):
+        return error(400, 'Send {"seen": true} or {"seen": false}')
+    updated = await asyncio.to_thread(alerts.mark_seen, num, seen)
+    if updated is None:
+        return error(404, f"No alert {num}")
+    await state_of(request).broadcast({"type": "alerts_changed"})
+    return JSONResponse(updated)
+
+
 def html_email_headers(images: bool) -> dict:
     """Browser rules for an email shown as a web page.
 
@@ -338,9 +355,24 @@ def html_email_headers(images: bool) -> dict:
     }
 
 
+# How an email made for white paper is shown in the page's color themes.
+# Dark: flip the colors (white paper -> dark), then flip pictures back so photos
+# and logos keep their real colors. Only CSS: nothing in the email is changed.
+_KEEP_PICTURES = ("img, video, picture, canvas, svg, [style*='background-image']"
+                  " { filter: invert(1) hue-rotate(180deg) !important; }")
+EMAIL_LOOKS = {
+    "dark": "html { background: #fff !important; filter: invert(.9) hue-rotate(180deg) !important; } "
+            + _KEEP_PICTURES,
+    "contrast": "html { background: #fff !important; filter: invert(1) hue-rotate(180deg) "
+                "contrast(1.2) !important; } " + _KEEP_PICTURES,
+    "paper": "html { filter: sepia(.2) brightness(.97) !important; }",
+}
+
+
 async def get_email_html(request: Request):
     email_id = request.path_params["email_id"]
     images = request.query_params.get("images") == "1"
+    look = EMAIL_LOOKS.get(request.query_params.get("look", ""), "")
 
     def load():
         with closing(database.open_db()) as conn:
@@ -350,7 +382,10 @@ async def get_email_html(request: Request):
     if markup is None:
         return error(404, f"No HTML version for email {email_id!r}")
     # <base target="_blank">: links open in a new browser tab, not inside the frame.
-    page = '<!doctype html><meta charset="utf-8"><base target="_blank">' + markup
+    page = '<!doctype html><meta charset="utf-8"><base target="_blank">'
+    if look:
+        page += f"<style>{look}</style>"
+    page += markup
     return HTMLResponse(page, headers=html_email_headers(images))
 
 
@@ -592,6 +627,7 @@ def create_app(config: Config | None = None, *, chat_turn=None, sync_fn=sync,
     app = Starlette(routes=[
         Route("/api/alerts", get_alerts, methods=["GET"]),
         Route("/api/alerts/{num:int}", post_alert, methods=["POST"]),
+        Route("/api/alerts/{num:int}/seen", post_alert_seen, methods=["POST"]),
         Route("/api/email/{email_id:path}", get_email, methods=["GET"]),
         Route("/api/email-html/{email_id:path}", get_email_html, methods=["GET"]),
         Route("/api/listeners", get_listeners, methods=["GET"]),

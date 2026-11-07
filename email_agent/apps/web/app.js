@@ -8,7 +8,12 @@
 const $ = (selector) => document.querySelector(selector);
 const SESSION_KEY = "email-agent-session";
 const KINDS = { action: "📝", coupon: "🏷️", money: "💳", security: "🔐" };
-const FILTERS = [["new", "New"], ["done", "Done"], ["dismissed", "Not important"], ["all", "All"]];
+// "To do" = not handled yet (status "new" on the server). "New" on a card = not opened yet.
+const FILTERS = [["new", "To do"], ["done", "Done"], ["dismissed", "Not important"], ["all", "All"]];
+const THEME_KEY = "email-agent-theme";  // theme.js reads it too
+const THEMES = [["auto", "Auto (like your computer)"], ["light", "Light"], ["dark", "Dark"],
+                ["paper", "Paper (warm)"], ["contrast", "High contrast"]];
+const PAGE_TITLE = document.title;
 
 let filter = "new";       // which alerts the list shows
 let selected = null;      // the alert whose email is open
@@ -20,6 +25,7 @@ const imagesAllowed = new Set();  // emails whose pictures from the web you allo
 let socket = null;        // the WebSocket to the server
 let answerBubble = null;  // the assistant bubble being filled in
 let busy = false;         // waiting for Claude?
+let canMarkSeen = true;   // false: the server is older than this page (restart it)
 
 // ---------- small helpers ----------
 
@@ -88,6 +94,13 @@ async function loadAlerts() {
     const data = await api("/api/alerts?limit=200&status=" + filter);
     mailbox = data.mailbox;
     phoneOn = data.phone;
+    // An older server (started before "seen" existed) can't remember what you opened.
+    // Say so once, instead of showing every alert as new after each refresh.
+    if (canMarkSeen && data.stats.unseen === undefined) {
+      canMarkSeen = false;
+      toast("This page was updated. Restart  uv run email-agent  so it can remember " +
+            "which alerts you opened.", "error");
+    }
     showStats(data);
     $("#alert-list").replaceChildren(...data.alerts.map(alertCard));
     if (!data.alerts.length) {
@@ -120,7 +133,11 @@ function showStats(data) {
       type: "button", class: "tab" + (key === filter ? " active" : ""),
       onclick: () => { filter = key; loadAlerts(); },
     }, text, key === "new" || key === "done" || key === "dismissed"
-      ? el("span", { class: "count" }, " " + s.counts[key]) : null)));
+      ? el("span", { class: "count" }, " " + s.counts[key]) : null,
+      key === "new" && s.unseen
+        ? el("span", { class: "unseen-count", title: "not opened yet" }, `${s.unseen} new`) : null)));
+  // the browser tab shows how many you haven't opened yet, like a mail app
+  document.title = s.unseen ? `(${s.unseen}) ${PAGE_TITLE}` : PAGE_TITLE;
 }
 
 function delivery(alert) {
@@ -148,16 +165,20 @@ function alertCard(alert) {
        button("🙈 Not important", "Teach the agent: don't alert about emails like this",
          act("dismissed")),
        button("🔇 Mute", "Never alert about this sender again", act("dismissed", true))]
-    : [button("↩ Back to new", "Move it back to New", act("new"))];
+    : [button("↩ Back to to-do", "Move it back to To do", act("new"))];
   return el("li", {
       class: "alert kind-" + alert.kind + (alert.urgent ? " urgent" : "")
+        + (alert.seen || !canMarkSeen ? " seen" : " unseen")
         + (selected && selected.num === alert.num ? " selected" : ""),
       tabindex: "0", "data-num": String(alert.num),
       onclick: () => openAlert(alert),
       onkeydown: (event) => { if (event.key === "Enter") openAlert(alert); },
     },
     el("div", { class: "line1" },
-      el("span", { class: "title" }, (KINDS[alert.kind] || "🔔") + " " + alert.title),
+      el("span", { class: "title" },
+        (KINDS[alert.kind] || "🔔") + " " + alert.title,
+        alert.seen || !canMarkSeen ? null
+          : el("span", { class: "new-tag", title: "You haven't opened this one yet" }, "New")),
       el("span", { class: "time" }, shortTime(alert.created))),
     el("div", { class: "message" }, alert.message),
     el("div", { class: "meta" }, senderName(alert.sender), " · ", delivery(alert)),
@@ -170,10 +191,25 @@ function gmailLink(emailId) {
   return "https://mail.google.com/mail/u/0/#search/rfc822msgid:" + encodeURIComponent(id);
 }
 
+// Seen = you opened it on this page. Saved by the server, so every browser agrees.
+async function markSeen(alert, seen) {
+  try {
+    const updated = await api(`/api/alerts/${alert.num}/seen`, {
+      method: "POST", body: JSON.stringify({ seen }),
+    });
+    alert.seen = updated.seen;
+    refreshSoon();  // the unseen count
+  } catch (problem) { toast(problem.message, "error"); }
+}
+
 async function openAlert(alert) {
   selected = alert;
-  document.querySelectorAll(".alert").forEach((card) =>
-    card.classList.toggle("selected", card.dataset.num === String(alert.num)));
+  document.querySelectorAll(".alert").forEach((card) => {
+    const isThis = card.dataset.num === String(alert.num);
+    card.classList.toggle("selected", isThis);
+    if (isThis) { card.classList.remove("unseen"); card.classList.add("seen"); }
+  });
+  if (!alert.seen && canMarkSeen) markSeen(alert, true);
   try {
     const email = await api("/api/email/" + encodeURIComponent(alert.email_id));
     const asPage = email.has_html && !showText;
@@ -185,6 +221,10 @@ async function openAlert(alert) {
       el("div", { class: "meta" },
         el("div", {}, el("b", {}, "From: "), email.from),
         el("div", {}, el("b", {}, "Date: "), new Date(email.date).toLocaleString()),
+        canMarkSeen ? el("div", {}, el("button", {
+          type: "button", class: "small", title: "Show it as not opened yet in the list",
+          onclick: () => { markSeen(alert, false); },
+        }, "● Mark as new")) : null,
         mailbox === "imap" && provider === "gmail"
           ? el("div", {}, el("a", { href: gmailLink(email.id), target: "_blank",
               rel: "noopener noreferrer" }, "Open in Gmail ↗")) : null),
@@ -214,9 +254,19 @@ function viewSwitch(alert, asPage) {
 
 // The email's own HTML, in a locked frame: the sandbox blocks its scripts, forms and
 // any access to this page; the server adds strict rules of its own.
+// Which look the email gets, so it matches the page (white paper in a dark page looks awful).
+function emailLook() {
+  const theme = document.documentElement.dataset.theme || "auto";
+  if (theme === "auto") return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "";
+  return ["dark", "contrast", "paper"].includes(theme) ? theme : "";
+}
+
 function htmlFrame(id) {
+  const params = new URLSearchParams();
+  if (imagesAllowed.has(id)) params.set("images", "1");
+  if (emailLook()) params.set("look", emailLook());
   let src = "/api/email-html/" + encodeURIComponent(id);
-  if (imagesAllowed.has(id)) src += "?images=1";
+  if (params.size) src += "?" + params;
   return el("iframe", {
     class: "html-frame", src, title: "Email as a web page",
     sandbox: "allow-popups allow-popups-to-escape-sandbox", referrerpolicy: "no-referrer",
@@ -346,9 +396,13 @@ function connect() {
 
 async function setupHeader() {
   const info = await api("/api/info");
-  provider = info.provider;
+  provider = info.provider || "";
+  // which mailbox this page reads: the made-up demo emails, or your real one
   $("#mode").textContent = info.mailbox === "demo" ? "demo mailbox"
-                                                   : "watching " + info.provider_name;
+    : "watching " + (info.provider_name || "your mailbox");
+  $("#mode").title = info.mailbox === "demo"
+    ? "Made-up emails for trying things out (MAILBOX=demo in .env)"
+    : "New mail in your real mailbox is checked automatically";
   const area = $("#arrive");
   if (info.mailbox === "demo") {
     area.append(el("span", { class: "muted" }, "Pretend new mail: "));
@@ -380,6 +434,25 @@ async function setupHeader() {
   }
 }
 
+// ---------- color theme ----------
+
+function setupTheme() {
+  const pick = $("#theme");
+  let current = "auto";
+  try { current = localStorage.getItem(THEME_KEY) || "auto"; } catch (problem) { /* private window */ }
+  pick.replaceChildren(...THEMES.map(([key, text]) => el("option", { value: key }, text)));
+  pick.value = current;
+  pick.addEventListener("change", () => {
+    document.documentElement.dataset.theme = pick.value;
+    try { localStorage.setItem(THEME_KEY, pick.value); } catch (problem) { /* not saved */ }
+    if (selected) openAlert(selected);  // show the open email in the new colors
+  });
+  // "Auto": when the computer switches between light and dark, follow it
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (pick.value === "auto" && selected) openAlert(selected);
+  });
+}
+
 // ---------- start ----------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -398,6 +471,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "new_chat" }));
   });
 
+  setupTheme();
   setupHeader().catch((problem) => toast(problem.message, "error"));
   loadAlerts();
   connect();

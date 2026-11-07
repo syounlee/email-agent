@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS alerts (
     summarized TEXT,                        -- date of the summary it went out in
     status     TEXT NOT NULL DEFAULT 'new', -- new | done | dismissed (not important)
     sender     TEXT NOT NULL DEFAULT '',
-    subject    TEXT NOT NULL DEFAULT ''
+    subject    TEXT NOT NULL DEFAULT '',
+    seen       TEXT                         -- when you first opened it on the page (NULL = not yet)
 );
 -- Senders you muted: their mail is never sent to Claude or alerted again.
 CREATE TABLE IF NOT EXISTS muted_senders (
@@ -69,9 +70,12 @@ def open_alerts(path=None):
     have = {row[1] for row in conn.execute("PRAGMA table_info(alerts)")}
     for column, kind in [("status", "TEXT NOT NULL DEFAULT 'new'"),
                          ("sender", "TEXT NOT NULL DEFAULT ''"),
-                         ("subject", "TEXT NOT NULL DEFAULT ''")]:
+                         ("subject", "TEXT NOT NULL DEFAULT ''"),
+                         ("seen", "TEXT")]:
         if column not in have:  # alerts saved before these existed
             conn.execute(f"ALTER TABLE alerts ADD COLUMN {column} {kind}")
+            if column == "seen":  # ones you already handled were clearly seen
+                conn.execute("UPDATE alerts SET seen = created WHERE status != 'new'")
     conn.commit()
     return conn
 
@@ -152,11 +156,33 @@ def set_status(num: int, status: str, mute: bool = False, path=None) -> dict | N
         raise ValueError(f"status must be one of {STATUSES}")
     with closing(open_alerts(path)) as conn:
         conn.execute("UPDATE alerts SET status = ? WHERE num = ?", (status, num))
+        if status != "new":  # handling an alert means you've seen it
+            conn.execute("UPDATE alerts SET seen = COALESCE(seen, ?) WHERE num = ?",
+                         (_now(), num))
         row = conn.execute("SELECT * FROM alerts WHERE num = ?", (num,)).fetchone()
         if row and mute and row["sender"]:
             conn.execute("INSERT OR IGNORE INTO muted_senders (sender, created) VALUES (?, ?)",
                          (sender_address(row["sender"]),
                           datetime.now().isoformat(timespec="seconds")))
+        conn.commit()
+    return dict(row) if row else None
+
+
+def _now() -> str:
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def mark_seen(num: int, seen: bool = True, path=None) -> dict | None:
+    """Mark an alert as opened (keeps the first time), or as not opened yet.
+
+    Returns the updated alert, or None if there is no such alert.
+    """
+    with closing(open_alerts(path)) as conn:
+        if seen:
+            conn.execute("UPDATE alerts SET seen = COALESCE(seen, ?) WHERE num = ?", (_now(), num))
+        else:
+            conn.execute("UPDATE alerts SET seen = NULL WHERE num = ?", (num,))
+        row = conn.execute("SELECT * FROM alerts WHERE num = ?", (num,)).fetchone()
         conn.commit()
     return dict(row) if row else None
 
@@ -191,7 +217,10 @@ def stats(days: int = 7, now: datetime | None = None, path=None) -> dict:
         counts.update({r["status"]: r["n"] for r in conn.execute(
             "SELECT status, COUNT(*) AS n FROM alerts GROUP BY status")})
         muted = conn.execute("SELECT COUNT(*) FROM muted_senders").fetchone()[0]
-    return {"days": days, "emails": emails, "alerts": alerted, "counts": counts, "muted": muted}
+        unseen = conn.execute("SELECT COUNT(*) FROM alerts WHERE status = 'new' "
+                              "AND seen IS NULL").fetchone()[0]
+    return {"days": days, "emails": emails, "alerts": alerted, "counts": counts, "muted": muted,
+            "unseen": unseen}
 
 
 def why_skip(email_id: str, path=None) -> str | None:

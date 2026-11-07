@@ -198,3 +198,39 @@ async def test_mute_holds_for_every_listener(phone):
     ctx = ScriptContext("work-alerts", show=lambda _: None)
     await ctx.alert("e012", "work", "Work: offsite", "From x", urgent=True)
     assert phone.sent == [] and ctx.actions == ["sender muted: Work: offsite"]
+
+
+def test_seen_and_unseen():
+    alerts.add_alert("e004", "coupon", "Bookshop: 10% code", "BOOK10", urgent=False, pushed=False)
+    alerts.add_alert("e008", "action", "Data Digest", "renew", urgent=False, pushed=False)
+    [digest, book] = alerts.recent_alerts()
+    assert digest["seen"] is None and alerts.stats()["unseen"] == 2  # new alerts: not opened yet
+
+    first = alerts.mark_seen(book["num"])["seen"]
+    assert first and alerts.stats()["unseen"] == 1
+    assert alerts.mark_seen(book["num"])["seen"] == first     # keeps the first time
+    assert alerts.mark_seen(book["num"], seen=False)["seen"] is None
+    assert alerts.mark_seen(999) is None
+
+    alerts.set_status(digest["num"], "done")                    # handled means seen
+    assert alerts.recent_alerts(status="done")[0]["seen"]
+    assert alerts.stats()["unseen"] == 1                        # only the book alert again
+
+
+def test_older_databases_get_the_seen_column(tmp_path):
+    import sqlite3
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE alerts (num INTEGER PRIMARY KEY, created TEXT NOT NULL, "
+                 "email_id TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, "
+                 "message TEXT NOT NULL, urgent INTEGER NOT NULL, pushed INTEGER NOT NULL "
+                 "DEFAULT 0, summarized TEXT, status TEXT NOT NULL DEFAULT 'new')")
+    conn.execute("INSERT INTO alerts (created, email_id, kind, title, message, urgent, status) "
+                 "VALUES ('2026-11-01T09:00:00', 'a', 'money', 'Old done', '', 0, 'done')")
+    conn.execute("INSERT INTO alerts (created, email_id, kind, title, message, urgent, status) "
+                 "VALUES ('2026-11-02T09:00:00', 'b', 'money', 'Old new', '', 0, 'new')")
+    conn.commit()
+    conn.close()
+    by_title = {a["title"]: a for a in alerts.recent_alerts(path=path)}
+    assert by_title["Old done"]["seen"] == "2026-11-01T09:00:00"  # handled: counted as seen
+    assert by_title["Old new"]["seen"] is None
